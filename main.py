@@ -14,7 +14,6 @@ load_dotenv()
 # --- CONFIGURATION ---
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
-# MAKE SURE THIS URL MATCHES YOUR GITHUB PAGES URL EXACTLY
 WEBAPP_URL = "https://usage217-tech.github.io/Mytho-rp/" 
 MODEL = "gryphe/mythomax-l2-13b"
 
@@ -23,11 +22,13 @@ client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY)
 app = Flask(__name__)
 user_sessions = {}
 
-# --- FLASK SERVER (For Render) ---
+# --- FLASK SERVER (For Render Port Binding) ---
 @app.route('/')
-def home(): return "Mythos Engine is Awake."
+def home(): 
+    return "Mythos Engine is Awake."
 
 def run_flask():
+    # Render uses the PORT environment variable
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
 
@@ -49,7 +50,6 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = json.loads(update.effective_message.web_app_data.data)
         user_id = update.effective_user.id
         
-        # Extracting data from WebApp
         char_name = data.get('ai_name', 'Unknown')
         char_desc = data.get('ai_desc', 'A mysterious figure')
         char_image = data.get('ai_image') 
@@ -57,7 +57,6 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_gender = data.get('user_gender', 'not specified') 
         scenario = data.get('scenario', 'A meeting in the dark.')
 
-        # --- CORRECTED SYSTEM PROMPT ---
         system_prompt = (
             f"You are playing as {char_name}.\n"
             f"Personality: {char_desc}.\n"
@@ -79,16 +78,13 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Formatting:\n\"dialogue\"\n*actions* *quiet thoughts/murmurs in italics*"
         )
 
-        # Store session
         user_sessions[user_id] = {
             "history": [{"role": "system", "content": system_prompt}],
             "char_name": char_name
         }
         
-        # Initial Trigger
         start_trigger = f"[SCENARIO SETUP - USER PERSPECTIVE]: {scenario}\n\n[START THE STORY NOW AS {char_name}]"
         
-        # Send Character Photo if available
         status_text = f"🌑 **Summoning {char_name}...**"
         if char_image:
             await update.message.reply_photo(
@@ -104,7 +100,6 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown"
             )
         
-        # Generate First AI Response
         await generate_reply(update, user_id, start_trigger)
 
     except Exception as e:
@@ -139,16 +134,21 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await generate_reply(update, user_id, update.message.text)
 
 def main():
+    # Initialize the Application
     application = Application.builder().token(TOKEN).build()
     
+    # Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_manifest))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
 
-    # Run Flask in background
-    Thread(target=run_flask).start()
+    # Run Flask in a separate thread so it doesn't block the bot
+    flask_thread = Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
     
-    # Run Bot
+    # Run the bot
+    print("Bot is polling...")
     application.run_polling()
 
 if __name__ == "__main__":
