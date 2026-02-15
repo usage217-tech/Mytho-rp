@@ -187,23 +187,71 @@
 
         const CHARACTERS = {
             Female: [
-                { id: 'custom', name: "Custom Soul", desc: "Forge a unique entity from the void.", isCustom: true, image: "" },
-                { name: "Lilith", desc: "Ancient Female seductive succubus. Hourglass form, crimson skin, small horns. Insatiable lust feeder.", image: "https://i.postimg.cc/nLPJ8WTn/image-14.jpg", scenes: ["You secretly descended into the forgotten catacombs... a crimson silhouette waited...", "You broke into the sealed crypt at moonrise... curvy dark form stepped out..."] },
-                { name: "Hellien", desc: "300-year-old elegant vampire queen. Pale flawless skin, lithe athletic body. Predatory dominant.", image: "https://i.postimg.cc/Pr40sc5p/image-10.jpg", scenes: ["You climbed the crumbling tower stairs... elegant lithe body draped in crimson silk...", "You slipped through the secret passage... regal figure rose from darkness..."] },
-                { name: "Maya", desc: "38-year-old ruthless billionaire CEO. Tall toned, power suits. Ice-cold control freak.", image: "https://i.postimg.cc/rs9ZT0cN/image-20.jpg", scenes: ["You used the override code... sharp silhouette turned from the windows...", "You infiltrated the private penthouse elevator... commanding figure stood at the bar..."] },
-                { name: "Nika", desc: "21-year-old spoiled rich stepsis. Slim athletic, bratty smirk. Teasing heiress vibe.", image: "https://i.postimg.cc/W4J93fT3/image-8.jpg", scenes: ["The mansion was silent past 2 AM... bedroom door eased open...", "You heard the shower stop... bratty silhouette appeared in the corridor..."] },
-                { name: "Mrs. Grace", desc: "39-year-old seductive milf stepmom. Voluptuous curves. Nurturing yet predatory.", image: "https://i.postimg.cc/dtqSBBmz/image-15.jpg", scenes: ["You came downstairs for a midnight snack... voluptuous silhouette leaned against the island...", "Master bedroom door cracked open... seductive milf figure sat on the edge of the bed..."] }
+                { id: 'custom', name: "Custom Soul", desc: "Forge a unique entity from the void.", isCustom: true, image: "", video: "" },
+                { 
+                    name: "Lilith", 
+                    desc: "Ancient Female seductive succubus. Hourglass form, crimson skin, small horns. Insatiable lust feeder.", 
+                    image: "https://i.postimg.cc/nLPJ8WTn/image-14.jpg", 
+                    video: "https://usage217-tech.github.io/Charecter-mp4/Lilith.mp4",
+                    scenes: ["You secretly descended into the forgotten catacombs... a crimson silhouette waited...", "You broke into the sealed crypt at moonrise... curvy dark form stepped out..."] 
+                },
+                { 
+                    name: "Hellien", 
+                    desc: "300-year-old elegant vampire queen. Pale flawless skin, lithe athletic body. Predatory dominant.", 
+                    image: "https://i.postimg.cc/Pr40sc5p/image-10.jpg", 
+                    video: "https://usage217-tech.github.io/Charecter-mp4/Hellien.mp4",
+                    scenes: ["You climbed the crumbling tower stairs... elegant lithe body draped in crimson silk...", "You slipped through the secret passage... regal figure rose from darkness..."] 
+                },
+                { 
+                    name: "Maya", 
+                    desc: "38-year-old ruthless billionaire CEO. Tall toned, power suits. Ice-cold control freak.", 
+                    image: "https://i.postimg.cc/rs9ZT0cN/image-20.jpg", 
+                    video: "https://usage217-tech.github.io/Charecter-mp4/Maya.mp4",
+                    scenes: ["You used the override code... sharp silhouette turned from the windows...", "You infiltrated the private penthouse elevator... commanding figure stood at the bar..."] 
+                },
+                { 
+                    name: "Nika", 
+                    desc: "21-year-old spoiled rich stepsis. Slim athletic, bratty smirk. Teasing heiress vibe.", 
+                    image: "https://i.postimg.cc/W4J93fT3/image-8.jpg", 
+                    video: "https://usage217-tech.github.io/Charecter-mp4/Nika.mp4",
+                    scenes: ["The mansion was silent past 2 AM... bedroom door eased open...", "You heard the shower stop... bratty silhouette appeared in the corridor..."] 
+                },
+                { 
+                    name: "Mrs. Grace", 
+                    desc: "39-year-old seductive milf stepmom. Voluptuous curves. Nurturing yet predatory.", 
+                    image: "https://i.postimg.cc/dtqSBBmz/image-15.jpg", 
+                    video: "https://usage217-tech.github.io/Charecter-mp4/Grace.mp4",
+                    scenes: ["You came downstairs for a midnight snack... voluptuous silhouette leaned against the island...", "Master bedroom door cracked open... seductive milf figure sat on the edge of the bed..."] 
+                }
             ],
             Male: [
-                { id: 'custom', name: "Custom Soul", desc: "Forge a unique entity from the void.", isCustom: true, image: "" },
-                { name: "Robert", desc: "35-year-old brooding tech billionaire. Tall broad, chiseled jaw. Possessive owner.", image: "https://i.postimg.cc/NFN8b1Qt/image-5.jpg", scenes: ["You were driven to his secluded coastal compound... tall broad silhouette waited...", "You entered the underground bunker... brooding figure stood at the control panel..."] },
-                { name: "Mike", desc: "46-year-old wealthy stepdad. Tall broad, silver-streaked hair. Strict daddy dom.", image: "https://i.postimg.cc/pXTJr1Bj/image-7.jpg", scenes: ["Mansion was quiet... tall broad silhouette appeared in the doorway...", "Woke to the sound of a key... wealthy stepdad figure stepped into your room.."] },
-                { name: "John", desc: "24-year-old dominant stepbro. Tall muscular, ripped abs, cocky grin. Possessive big-bro energy.", image: "https://i.postimg.cc/JhbbSwRb/image-6.jpg", scenes: ["House lights off... parents gone... tall muscular shadow filled the frame...", "Door eased open... dominant stepbro silhouette entered... cocky grin in moonlight."] }
+                { id: 'custom', name: "Custom Soul", desc: "Forge a unique entity from the void.", isCustom: true, image: "", video: "" },
+                { 
+                    name: "Robert", 
+                    desc: "35-year-old brooding tech billionaire. Tall broad, chiseled jaw. Possessive owner.", 
+                    image: "https://i.postimg.cc/NFN8b1Qt/image-5.jpg", 
+                    video: "https://usage217-tech.github.io/Charecter-mp4/Robert.mp4",
+                    scenes: ["You were driven to his secluded coastal compound... tall broad silhouette waited...", "You entered the underground bunker... brooding figure stood at the control panel..."] 
+                },
+                { 
+                    name: "Mike", 
+                    desc: "46-year-old wealthy stepdad. Tall broad, silver-streaked hair. Strict daddy dom.", 
+                    image: "https://i.postimg.cc/pXTJr1Bj/image-7.jpg", 
+                    video: "https://usage217-tech.github.io/Charecter-mp4/Mike.mp4",
+                    scenes: ["Mansion was quiet... tall broad silhouette appeared in the doorway...", "Woke to the sound of a key... wealthy stepdad figure stepped into your room.."] 
+                },
+                { 
+                    name: "John", 
+                    desc: "24-year-old dominant stepbro. Tall muscular, ripped abs, cocky grin. Possessive big-bro energy.", 
+                    image: "https://i.postimg.cc/JhbbSwRb/image-6.jpg", 
+                    video: "https://usage217-tech.github.io/Charecter-mp4/John.mp4",
+                    scenes: ["House lights off... parents gone... tall muscular shadow filled the frame...", "Door eased open... dominant stepbro silhouette entered... cocky grin in moonlight."] 
+                }
             ]
         };
 
         // Initialize selection object
-        let selection = { charName: "", charDesc: "", userName: "", userGender: "Male", scenario: "", imageUrl: "" };
+        let selection = { charName: "", charDesc: "", userName: "", userGender: "Male", scenario: "", imageUrl: "", videoUrl: "" };
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -251,11 +299,13 @@
                 selection.charName = ""; 
                 selection.charDesc = ""; 
                 selection.imageUrl = ""; 
+                selection.videoUrl = "";
             } else {
                 document.getElementById('custom-fields').classList.add('hidden');
                 selection.charName = c.name; 
                 selection.charDesc = c.desc;
                 selection.imageUrl = c.image; 
+                selection.videoUrl = c.video || "";
                 
                 const sGrid = document.getElementById('scene-suggestions');
                 sGrid.innerHTML = '';
@@ -282,6 +332,7 @@
                 ai_name: selection.charName || document.getElementById('custom-name').value,
                 ai_desc: selection.charDesc || document.getElementById('custom-desc').value,
                 ai_image: selection.imageUrl, 
+                ai_video: selection.videoUrl,
                 user_name: document.getElementById('user-name').value,
                 user_gender: selection.userGender,
                 scenario: document.getElementById('scenario-input').value
@@ -301,3 +352,4 @@
     </script>
 </body>
 </html>
+
