@@ -16,7 +16,7 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
 # MAKE SURE THIS URL MATCHES YOUR GITHUB PAGES URL EXACTLY
 WEBAPP_URL = "https://usage217-tech.github.io/Mytho-rp/" 
-MODEL = "gryphe/mythomax-l2-13b"
+MODEL = "x-ai/grok-4.1-fast"
 
 # Initialize Clients
 client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY)
