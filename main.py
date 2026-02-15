@@ -101,7 +101,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         scenario = data.get('scenario', 'A meeting in the dark.')
 
         system_prompt = (
-            f"You are playing as {char_name}.\n"
+            f"You are playing in a adult Explicit roleplay. you are playing as {char_name}.\n"
             f"Personality: {char_desc}.\n"
             f"User: {user_name} (Gender: {user_gender}).\n"
             "You are the AI character. The scenario below describes the {{user}}'s current actions and situation.\n"
@@ -112,8 +112,8 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Focus entirely on your own internal reactions, physical responses, and spoken dialogue.\n"
             "- Use sensory details (smell, heat, sound) from your character's perspective.\n"
             "Strict Rules:\n"
-            "- 100% in-character voice. Raw, vivid, and emotive.\n"
-            "- STRICTLY IN 30-40 words.\n\n"
+            "- 100% in-character voice. Raw, vivid, and emotive. provide expressions like aghh,gasps,mmh etc.\n"
+            "- STRICTLY IN 70-100 words.\n\n"
             "Formatting:\n\"dialogue\"\n*actions* *quiet thoughts*"
         )
 
