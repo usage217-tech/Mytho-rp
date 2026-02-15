@@ -121,7 +121,6 @@
                 <h2 class="font-cinzel text-xl text-purple-100">Your Identity</h2>
                 <p class="text-[10px] uppercase tracking-widest text-purple-400/60">Define your presence</p>
             </div>
-
             <section class="space-y-4">
                 <div class="flex items-center gap-2">
                     <i data-lucide="user" class="w-4 h-4 text-purple-400"></i>
@@ -129,7 +128,6 @@
                 </div>
                 <input type="text" id="user-name" placeholder="Enter your name..." class="pro-input w-full p-5 font-serif text-xl text-center" />
             </section>
-
             <section class="space-y-4">
                 <div class="flex items-center gap-2">
                     <i data-lucide="venn-diagram" class="w-4 h-4 text-purple-400"></i>
@@ -141,7 +139,6 @@
                     <button onclick="setUserGender('Other')" id="user-o" class="gender-btn py-3 rounded-xl font-cinzel text-xs tracking-widest uppercase">Other</button>
                 </div>
             </section>
-
             <div class="text-center pt-4">
                  <button onclick="switchTab('scenario')" class="px-8 py-3 rounded-full border border-purple-500/30 text-purple-200 font-cinzel text-xs uppercase tracking-widest hover:bg-purple-900/20 transition-all">Next: The Setting &rarr;</button>
             </div>
@@ -156,7 +153,6 @@
                 <div id="scene-suggestions" class="grid gap-3 mb-4"></div>
                 <textarea id="scenario-input" placeholder="How does the story begin?..." class="pro-input w-full p-4 h-40 font-serif text-lg resize-none"></textarea>
             </section>
-            
             <button onclick="manifest()" id="submit-btn" class="w-full py-5 bg-gradient-to-r from-purple-700 to-indigo-800 text-white font-cinzel text-sm font-bold uppercase tracking-[0.3em] rounded-2xl shadow-[0_0_30px_rgba(126,34,206,0.4)] border border-purple-400/30 flex items-center justify-center gap-3">
                 <span>Manifest Reality</span>
                 <i data-lucide="sparkles" class="w-5 h-5"></i>
@@ -206,7 +202,8 @@
             ]
         };
 
-        let selection = { charName: "", charDesc: "", userName: "", userGender: "Male", scenario: "" };
+        [cite_start]// Added imageUrl to selection object [cite: 50, 65-68]
+        let selection = { charName: "", charDesc: "", userName: "", userGender: "Male", scenario: "", imageUrl: "" };
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -232,7 +229,7 @@
                 btn.className = 'glass-panel p-4 text-left group transition-all duration-300 char-card flex items-center gap-5 w-full';
                 btn.innerHTML = `
                     <div class="relative flex-shrink-0">
-                        ${c.image ? `<img src="${c.image}" class="w-20 h-20 rounded-2xl object-cover border-2 border-purple-500/20 shadow-lg">` : `<div class="w-20 h-20 rounded-2xl bg-purple-900/30 flex items-center justify-center border-2 border-purple-500/10"><i data-lucide="sparkles" class="w-8 h-8 text-purple-400"></i></div>`}
+                         ${c.image ? `<img src="${c.image}" class="w-20 h-20 rounded-2xl object-cover border-2 border-purple-500/20 shadow-lg">` : `<div class="w-20 h-20 rounded-2xl bg-purple-900/30 flex items-center justify-center border-2 border-purple-500/10"><i data-lucide="sparkles" class="w-8 h-8 text-purple-400"></i></div>`}
                     </div>
                     <div class="flex-1 overflow-hidden">
                         <div class="font-serif italic text-2xl text-purple-100 group-hover:text-white mb-1">${c.name}</div>
@@ -250,10 +247,12 @@
             btn.classList.add('active-card');
             if(c.isCustom) {
                 document.getElementById('custom-fields').classList.remove('hidden');
-                selection.charName = ""; selection.charDesc = "";
+                selection.charName = ""; selection.charDesc = ""; selection.imageUrl = ""; 
             } else {
                 document.getElementById('custom-fields').classList.add('hidden');
-                selection.charName = c.name; selection.charDesc = c.desc;
+                selection.charName = c.name; 
+                selection.charDesc = c.desc;
+                selection.imageUrl = c.image; [cite_start]// Store image URL [cite: 58-61]
                 const sGrid = document.getElementById('scene-suggestions');
                 sGrid.innerHTML = '';
                 c.scenes.forEach(s => {
@@ -275,11 +274,11 @@
             const finalData = {
                 ai_name: selection.charName || document.getElementById('custom-name').value,
                 ai_desc: selection.charDesc || document.getElementById('custom-desc').value,
+                [cite_start]ai_image: selection.imageUrl, // Send image URL to bot [cite: 65-68]
                 user_name: document.getElementById('user-name').value,
                 user_gender: selection.userGender,
                 scenario: document.getElementById('scenario-input').value
             };
-
             if(!finalData.ai_name || !finalData.user_name || !finalData.scenario) {
                 tg.showAlert("Complete the ritual. All fields must be filled.");
                 return;
