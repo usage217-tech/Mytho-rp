@@ -202,7 +202,7 @@
             ]
         };
 
-        [cite_start]// Added imageUrl to selection object [cite: 50, 65-68]
+        // Initialize selection object
         let selection = { charName: "", charDesc: "", userName: "", userGender: "Male", scenario: "", imageUrl: "" };
 
         function switchTab(tabId) {
@@ -245,27 +245,34 @@
         function selectChar(c, btn) {
             document.querySelectorAll('.char-card').forEach(x => x.classList.remove('active-card'));
             btn.classList.add('active-card');
+            
             if(c.isCustom) {
                 document.getElementById('custom-fields').classList.remove('hidden');
-                selection.charName = ""; selection.charDesc = ""; selection.imageUrl = ""; 
+                selection.charName = ""; 
+                selection.charDesc = ""; 
+                selection.imageUrl = ""; 
             } else {
                 document.getElementById('custom-fields').classList.add('hidden');
                 selection.charName = c.name; 
                 selection.charDesc = c.desc;
-                selection.imageUrl = c.image; [cite_start]// Store image URL [cite: 58-61]
+                selection.imageUrl = c.image; 
+                
                 const sGrid = document.getElementById('scene-suggestions');
                 sGrid.innerHTML = '';
-                c.scenes.forEach(s => {
-                    const sb = document.createElement('button');
-                    sb.className = 'glass-panel p-4 text-left font-serif italic text-purple-200/80 hover:text-white transition-all w-full text-sm';
-                    sb.innerText = s;
-                    sb.onclick = () => {
-                        document.getElementById('scenario-input').value = s;
-                        document.querySelectorAll('#scene-suggestions button').forEach(b => b.classList.remove('active-card'));
-                        sb.classList.add('active-card');
-                    };
-                    sGrid.appendChild(sb);
-                });
+                
+                if (c.scenes) {
+                    c.scenes.forEach(s => {
+                        const sb = document.createElement('button');
+                        sb.className = 'glass-panel p-4 text-left font-serif italic text-purple-200/80 hover:text-white transition-all w-full text-sm';
+                        sb.innerText = s;
+                        sb.onclick = () => {
+                            document.getElementById('scenario-input').value = s;
+                            document.querySelectorAll('#scene-suggestions button').forEach(b => b.classList.remove('active-card'));
+                            sb.classList.add('active-card');
+                        };
+                        sGrid.appendChild(sb);
+                    });
+                }
                 setTimeout(() => switchTab('identity'), 300);
             }
         }
@@ -274,7 +281,7 @@
             const finalData = {
                 ai_name: selection.charName || document.getElementById('custom-name').value,
                 ai_desc: selection.charDesc || document.getElementById('custom-desc').value,
-                [cite_start]ai_image: selection.imageUrl, // Send image URL to bot [cite: 65-68]
+                ai_image: selection.imageUrl, 
                 user_name: document.getElementById('user-name').value,
                 user_gender: selection.userGender,
                 scenario: document.getElementById('scenario-input').value
