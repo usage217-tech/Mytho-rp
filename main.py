@@ -14,6 +14,7 @@ load_dotenv()
 # --- CONFIGURATION ---
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
+# MAKE SURE THIS URL MATCHES YOUR GITHUB PAGES URL EXACTLY
 WEBAPP_URL = "https://usage217-tech.github.io/Mytho-rp/" 
 MODEL = "gryphe/mythomax-l2-13b"
 
@@ -48,12 +49,12 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = json.loads(update.effective_message.web_app_data.data)
         user_id = update.effective_user.id
         
-        # [span_6](start_span)[span_7](start_span)Extracting data from WebApp[span_6](end_span)[span_7](end_span)
+        # Extracting data from WebApp
         char_name = data.get('ai_name', 'Unknown')
         char_desc = data.get('ai_desc', 'A mysterious figure')
-        char_image = data.get('ai_image') # Added image support
+        char_image = data.get('ai_image') 
         user_name = data.get('user_name', 'Traveler')
-        [span_8](start_span)user_gender = data.get('user_gender', 'not specified') # Added gender support[span_8](end_span)
+        user_gender = data.get('user_gender', 'not specified') 
         scenario = data.get('scenario', 'A meeting in the dark.')
 
         # --- CORRECTED SYSTEM PROMPT ---
@@ -74,11 +75,11 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "- Real speech: um, like, …, stutters, moans, raw dirty words that fit.\n"
             "- Vivid but believable: heat, slick, pulse, taste, clench, tremble.\n"
             "- Explicit, varied vocab. End open for reply.\n"
-            "- STRICTLY IN 50-60 words.\n\n"
+            "- STRICTLY IN 30-40 words.\n\n"
             "Formatting:\n\"dialogue\"\n*actions* *quiet thoughts/murmurs in italics*"
         )
 
-        # [span_9](start_span)[span_10](start_span)Store session[span_9](end_span)[span_10](end_span)
+        # Store session
         user_sessions[user_id] = {
             "history": [{"role": "system", "content": system_prompt}],
             "char_name": char_name
@@ -87,7 +88,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Initial Trigger
         start_trigger = f"[SCENARIO SETUP - USER PERSPECTIVE]: {scenario}\n\n[START THE STORY NOW AS {char_name}]"
         
-        # [span_11](start_span)[span_12](start_span)Send Character Photo if available[span_11](end_span)[span_12](end_span)
+        # Send Character Photo if available
         status_text = f"🌑 **Summoning {char_name}...**"
         if char_image:
             await update.message.reply_photo(
