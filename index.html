@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mythos Engine - Royal Noir</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pacifico&family=Cinzel:wght@400;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Inter:wght@300;400&display=swap');
+        
+        :root { --royal-purple: #c084fc; --deep-purple: #581c87; --night-bg: #030005; }
+        body { font-family: 'Inter', sans-serif; background: var(--night-bg); color: #e9d5ff; background-image: radial-gradient(circle at 50% 50%, #17042e 0%, #02010a 100%); min-height: 100vh; }
+        .font-pacifico { font-family: 'Pacifico', cursive; }
+        .font-cinzel { font-family: 'Cinzel', serif; }
+        .font-serif { font-family: 'Cormorant Garamond', serif; }
+        
+        .royal-card { background: rgba(15, 5, 20, 0.6); border: 1px solid rgba(192, 132, 252, 0.15); border-radius: 24px; backdrop-filter: blur(12px); transition: all 0.4s ease; }
+        .royal-card:hover { border-color: var(--royal-purple); box-shadow: 0 0 15px rgba(88, 28, 135, 0.4); }
+        .active { background: linear-gradient(135deg, #a855f7, #4c1d95) !important; color: #fff !important; border-color: #d8b4fe !important; }
+        .char-card.active { background: rgba(88, 28, 135, 0.25) !important; border-color: var(--royal-purple) !important; transform: scale(1.02); }
+        .novel-input { background: rgba(10, 5, 15, 0.4); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 18px; color: #f3e8ff; transition: all 0.3s ease; }
+        .novel-input:focus { border-color: var(--royal-purple); outline: none; }
+    </style>
+</head>
+<body class="p-4 pb-24">
+    <div class="max-w-xl mx-auto space-y-8">
+        
+        <header class="text-center py-6 space-y-2">
+            <h1 class="font-pacifico text-3xl text-purple-300 drop-shadow-lg">Mythos Engine</h1>
+            <p class="font-cinzel text-[10px] tracking-[0.4em] text-purple-400/60 uppercase">Royal Noir Roleplay</p>
+        </header>
+
+        <section class="space-y-4">
+            <label class="font-cinzel text-[10px] uppercase tracking-[0.3em] text-purple-300/70 font-bold ml-2">Divine Essence</label>
+            <div class="flex gap-4">
+                <button onclick="setAiGender('Male')" id="gender-male" class="flex-1 py-4 royal-card font-serif italic text-lg text-purple-300 hover:bg-purple-900/20">The King</button>
+                <button onclick="setAiGender('Female')" id="gender-female" class="flex-1 py-4 royal-card font-serif italic text-lg text-purple-300 hover:bg-purple-900/20">The Queen</button>
+            </div>
+        </section>
+
+        <section id="char-section" class="hidden space-y-4">
+            <label class="font-cinzel text-[10px] uppercase tracking-[0.3em] text-purple-300/70 font-bold ml-2">The Persona</label>
+            <div id="char-grid" class="grid gap-3"></div>
+        </section>
+
+        <section id="custom-fields" class="hidden space-y-4 animate-fade">
+            <input type="text" id="custom-name" placeholder="Name..." class="novel-input w-full p-4 font-serif italic text-lg" />
+            <textarea id="custom-desc" placeholder="Appearance & Personality..." class="novel-input w-full p-4 h-24 font-serif italic resize-none"></textarea>
+        </section>
+
+        <section id="user-section" class="hidden space-y-4">
+            <label class="font-cinzel text-[10px] uppercase tracking-[0.3em] text-purple-300/70 font-bold ml-2">Your Identity</label>
+            <input type="text" id="user-name" placeholder="Your Name..." class="novel-input w-full p-4 font-serif italic text-lg text-center" />
+        </section>
+
+        <section id="scene-section" class="hidden space-y-4">
+            <label class="font-cinzel text-[10px] uppercase tracking-[0.3em] text-purple-300/70 font-bold ml-2">The Setting</label>
+            <div id="scene-suggestions" class="grid gap-3"></div>
+            <textarea id="scenario-input" placeholder="Prologue..." class="novel-input w-full p-4 h-32 font-serif italic resize-none"></textarea>
+        </section>
+
+        <button onclick="manifest()" id="submit-btn" class="hidden fixed bottom-6 left-4 right-4 py-5 bg-gradient-to-r from-purple-900 to-indigo-900 text-purple-100 font-cinzel text-sm font-bold uppercase tracking-[0.3em] rounded-2xl shadow-2xl border border-purple-500/30 hover:scale-[1.02] transition-transform">
+            Manifest Reality
+        </button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        // --- DATA FROM YOUR FILE ---
+        const CHARACTERS = {
+            Female: [
+                { id: 'custom', name: "Create Custom", desc: "Design your own persona.", isCustom: true },
+                { name: "Lilith", desc: "Ancient seductive succubus. Curvy hourglass, crimson skin, small horns. Insatiable lust feeder.", scenes: ["You secretly descended into the forgotten catacombs... a crimson silhouette waited...", "You broke into the sealed crypt at moonrise..."] },
+                { name: "Hellien", desc: "300-year-old elegant vampire queen. Pale flawless skin, lithe athletic body. Predatory dominant.", scenes: ["You climbed the crumbling tower stairs... elegant lithe body draped in crimson silk...", "You slipped through the secret passage..."] },
+                { name: "Maya", desc: "38-year-old ruthless billionaire CEO. Tall toned, power suits. Ice-cold control freak.", scenes: ["You used the override code... sharp silhouette turned from the windows...", "You infiltrated the private penthouse elevator..."] },
+                { name: "Nika", desc: "21-year-old spoiled rich stepsis. Slim athletic, bratty smirk. Teasing heiress vibe.", scenes: ["The mansion was silent past 2 AM... bedroom door eased open...", "You heard the shower stop... bratty silhouette appeared..."] },
+                { name: "Mrs Grace", desc: "39-year-old seductive milf stepmom. Voluptuous curves. Nurturing yet predatory.", scenes: ["You came downstairs for a midnight snack... voluptuous silhouette leaned against the island...", "Master bedroom door cracked open..."] }
+            ],
+            Male: [
+                { id: 'custom', name: "Create Custom", desc: "Design your own persona.", isCustom: true },
+                { name: "Robert", desc: "35-year-old brooding tech billionaire. Tall broad, chiseled jaw. Possessive owner.", scenes: ["You were driven to his secluded coastal compound... tall broad silhouette waited...", "You entered the underground bunker..."] },
+                { name: "John", desc: "24-year-old dominant stepbro. Tall muscular, ripped abs, cocky grin.", scenes: ["House lights off... parents gone... tall muscular shadow filled the frame...", "Door eased open... dominant stepbro silhouette entered..."] },
+                { name: "Mike", desc: "46-year-old wealthy stepdad. Tall broad, silver-streaked hair. Strict daddy dom.", scenes: ["Mansion was quiet... tall broad silhouette appeared in the doorway...", "Woke to the sound of a key... wealthy stepdad figure stepped into your room..."] }
+            ]
+        };
+
+        let selection = { gender: '', charName: '', charDesc: '', userName: '', scenario: '' };
+
+        function setAiGender(g) {
+            selection.gender = g;
+            document.getElementById('gender-male').classList.remove('active');
+            document.getElementById('gender-female').classList.remove('active');
+            document.getElementById(`gender-${g.toLowerCase()}`).classList.add('active');
+            
+            // Show chars
+            const grid = document.getElementById('char-grid');
+            grid.innerHTML = '';
+            CHARACTERS[g].forEach(c => {
+                const btn = document.createElement('div');
+                btn.className = 'royal-card p-4 cursor-pointer char-card hover:bg-purple-900/20';
+                btn.innerHTML = `<div class="font-pacifico text-purple-300 mb-1">${c.name}</div><div class="text-xs text-purple-200/50 font-serif italic">${c.desc}</div>`;
+                btn.onclick = () => selectChar(c, btn);
+                grid.appendChild(btn);
+            });
+            document.getElementById('char-section').classList.remove('hidden');
+        }
+
+        function selectChar(c, el) {
+            document.querySelectorAll('.char-card').forEach(x => x.classList.remove('active'));
+            el.classList.add('active');
+            
+            if(c.isCustom) {
+                document.getElementById('custom-fields').classList.remove('hidden');
+                selection.charName = ""; 
+                selection.charDesc = "";
+            } else {
+                document.getElementById('custom-fields').classList.add('hidden');
+                selection.charName = c.name;
+                selection.charDesc = c.desc;
+            }
+
+            // Render Scenes
+            const sGrid = document.getElementById('scene-suggestions');
+            sGrid.innerHTML = '';
+            if(c.scenes) {
+                c.scenes.forEach(s => {
+                    const sb = document.createElement('div');
+                    sb.className = 'royal-card p-3 cursor-pointer text-xs font-serif italic text-purple-200/60 hover:text-purple-100 scene-card';
+                    sb.innerText = s;
+                    sb.onclick = () => {
+                        document.getElementById('scenario-input').value = s;
+                        document.querySelectorAll('.scene-card').forEach(x => x.classList.remove('active'));
+                        sb.classList.add('active');
+                    };
+                    sGrid.appendChild(sb);
+                });
+            }
+
+            document.getElementById('user-section').classList.remove('hidden');
+            document.getElementById('scene-section').classList.remove('hidden');
+            document.getElementById('submit-btn').classList.remove('hidden');
+        }
+
+        function manifest() {
+            // Final Data Collection
+            if(!selection.charName) selection.charName = document.getElementById('custom-name').value;
+            if(!selection.charDesc) selection.charDesc = document.getElementById('custom-desc').value;
+            selection.userName = document.getElementById('user-name').value;
+            selection.scenario = document.getElementById('scenario-input').value;
+
+            if(!selection.charName || !selection.userName || !selection.scenario) {
+                tg.showAlert("The scroll is incomplete. Please fill all fields.");
+                return;
+            }
+
+            // Send to Telegram
+            tg.sendData(JSON.stringify(selection));
+        }
+        
+        window.onload = () => lucide.createIcons();
+    </script>
+</body>
+</html>
