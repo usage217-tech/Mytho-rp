@@ -1,6 +1,8 @@
 import os
 import json
 import logging
+import requests
+from io import BytesIO
 from threading import Thread
 from urllib.parse import quote
 from flask import Flask
@@ -52,36 +54,52 @@ def get_utility_keyboard():
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 # --- IMAGE GENERATION ---
-def generate_scene_image(prompt_text, char_name=""):
-    """Generate scene image using Pollinations Klein model with API key."""
+def generate_scene_image(prompt_text, char_name="", char_desc="", reference_image_url=None):
+    """Generate scene image using Pollinations Klein model with API key and reference image."""
     try:
-        # Build the full prompt
-        if char_name:
+        # Build the full prompt with character details
+        if char_name and char_desc:
+            full_prompt = f"{char_name}, {char_desc}, {prompt_text}"
+        elif char_name:
             full_prompt = f"{char_name}, {prompt_text}"
         else:
             full_prompt = prompt_text
         
-        # Negative prompt for Klein model
-        negative = "bad anatomy, bad proportions, deformed, malformed limbs, mutated, disfigured, extra limbs, extra arms, extra legs, extra hands, extra fingers, missing legs, missing fingers, fused fingers, too many fingers, fewer fingers, poorly drawn hands, deformed hands, mutated hands, malformed hands"
-        
-        # URL encode
+        # URL encode the prompt
         encoded_prompt = quote(full_prompt)
-        encoded_negative = quote(negative)
         
-        # Build Pollinations URL with API key
-        image_url = (
-            f"https://image.pollinations.ai/prompt/{encoded_prompt}"
-            f"?model=klein"
-            f"&width=1024"
-            f"&height=1024"
-            f"&enhance=true"
-            f"&nologo=true"
-            f"&negative={encoded_negative}"
-            f"&key={POLLINATIONS_API_KEY}"
-        )
+        # Generate consistent seed from character name
+        seed = 0
+        if char_name:
+            import hashlib
+            seed = int(hashlib.md5(char_name.encode()).hexdigest()[:8], 16) % 1000000
         
-        logging.info(f"Generated image URL for prompt: {full_prompt[:50]}...")
-        return image_url
+        # Build Pollinations URL according to their API format
+        # https://gen.pollinations.ai/image/{prompt}?model=klein&width=1024&height=1024&seed=0&enhance=false&key=YOUR_API_KEY
+        image_url = f"https://gen.pollinations.ai/image/{encoded_prompt}"
+        params = [
+            f"model=klein",
+            f"width=1024",
+            f"height=1024",
+            f"seed={seed}",
+            f"enhance=false",  # Set to false as per API docs
+            f"key={POLLINATIONS_API_KEY}"
+        ]
+        
+        image_url += "?" + "&".join(params)
+        
+        logging.info(f"Fetching image for prompt: {full_prompt[:50]}... (seed: {seed})")
+        
+        # Download the image
+        response = requests.get(image_url, timeout=30)
+        
+        if response.status_code == 200:
+            image_bytes = BytesIO(response.content)
+            logging.info("Image downloaded successfully")
+            return image_bytes
+        else:
+            logging.error(f"Image generation failed with status {response.status_code}")
+            return None
         
     except Exception as e:
         logging.error(f"Image generation error: {e}")
@@ -166,12 +184,12 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "char_name": char_name,
             "char_desc": char_desc,
             "message_count": 0,
-            "char_reference_image": char_image
+            "char_reference_image": char_image  # Store for reference only
         }
         
         start_trigger = f"[SCENARIO SETUP - USER PERSPECTIVE]: {scenario}\n\n[START THE STORY NOW AS {char_name}]"
         
-        # 1. Video/GIF
+        # 1. Video/GIF (only for pre-loaded)
         if char_video:
             try:
                 await update.message.reply_animation(
@@ -182,16 +200,27 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logging.error(f"Video Error: {e}")
 
-        # 2. Character Photo & Status
+        # 2. Generate initial scene image based on scenario
         status_text = f"🌑 **Summoning {char_name}...** 🌙\n\n*The void shapes itself into a familiar form...*"
-        if char_image:
+        
+        # Create initial image prompt
+        initial_image_prompt = f"{scenario}, cinematic scene, detailed"
+        initial_scene_image = generate_scene_image(
+            initial_image_prompt, 
+            char_name=char_name,
+            char_desc=char_desc,
+            reference_image_url=char_image
+        )
+        
+        if initial_scene_image:
             await update.message.reply_photo(
-                photo=char_image,
+                photo=initial_scene_image,
                 caption=status_text,
                 reply_markup=get_utility_keyboard(),
                 parse_mode="Markdown"
             )
         else:
+            # Fallback to text if image generation fails
             await update.message.reply_text(
                 status_text, 
                 reply_markup=get_utility_keyboard(), 
@@ -237,15 +266,17 @@ async def generate_reply(update, user_id, input_text):
             
             if image_prompt:
                 # Generate the scene image
-                scene_image_url = generate_scene_image(
+                scene_image_bytes = generate_scene_image(
                     image_prompt,
-                    char_name=session["char_name"]
+                    char_name=session["char_name"],
+                    char_desc=session["char_desc"],
+                    reference_image_url=session.get("char_reference_image")
                 )
                 
-                if scene_image_url:
-                    # Send text with scene image
+                if scene_image_bytes:
+                    # Send text with scene image (using bytes instead of URL)
                     await update.message.reply_photo(
-                        photo=scene_image_url,
+                        photo=scene_image_bytes,
                         caption=ai_reply,
                         parse_mode="Markdown"
                     )
