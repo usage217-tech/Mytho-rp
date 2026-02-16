@@ -84,32 +84,35 @@ def generate_scene_image(prompt_text, char_name="", char_desc="", reference_imag
         # URL encode the prompt
         encoded_prompt = quote(full_prompt)
         
-        # Generate consistent seed from character name
-        seed = 0
-        if char_name:
-            import hashlib
-            seed = int(hashlib.md5(char_name.encode()).hexdigest()[:8], 16) % 1000000
-        
         # Build Pollinations URL with reference image support
         image_url = f"https://gen.pollinations.ai/image/{encoded_prompt}"
         params = [
             f"model=klein",
             f"width=1024",
             f"height=1024",
-            f"seed={seed}",
             f"enhance=false",
             f"key={POLLINATIONS_API_KEY}"
         ]
         
-        # Add reference image if provided (for pre-loaded characters or custom with saved reference)
+        # Add reference image if provided
         if reference_image_url:
             encoded_reference = quote(reference_image_url)
             params.append(f"reference={encoded_reference}")
-            logging.info(f"Using reference image: {reference_image_url[:50]}...")
+            logging.info(f"✅ USING REFERENCE: {reference_image_url}")
+            # When using reference, don't use seed - let reference control appearance
+        else:
+            # Only use seed when NO reference image (for consistency without reference)
+            if char_name:
+                import hashlib
+                seed = int(hashlib.md5(char_name.encode()).hexdigest()[:8], 16) % 1000000
+                params.append(f"seed={seed}")
+                logging.info(f"❌ NO REFERENCE - using seed: {seed}")
         
         image_url += "?" + "&".join(params)
         
-        logging.info(f"Fetching image for prompt: {full_prompt[:50]}... (seed: {seed})")
+        logging.info(f"🌐 FULL API URL: {image_url[:200]}...")
+        
+        logging.info(f"Fetching image for prompt: {full_prompt[:50]}...")
         
         # Download the image
         response = requests.get(image_url, timeout=30)
@@ -190,6 +193,14 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         char_video = CHARACTER_VIDEOS.get(char_name)
         char_reference = CHARACTER_REFERENCE_IMAGES.get(char_name)  # Get reference image for pre-loaded characters
+        
+        # DEBUG: Log what we found
+        logging.info(f"=== CHARACTER SETUP DEBUG ===")
+        logging.info(f"Character name: {char_name}")
+        logging.info(f"Has video: {char_video is not None}")
+        logging.info(f"Reference from mapping: {char_reference}")
+        logging.info(f"Custom image from user: {char_image}")
+        logging.info(f"=============================")
 
         system_prompt = (
     f"You are {char_name} in an explicit adult roleplay.\n"
