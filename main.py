@@ -134,10 +134,14 @@ async def get_image_prompt_from_grok(session_history, char_name):
         prompt_messages.append({
             "role": "user",
             "content": (
-                f"Based on our current roleplay scene, generate a SIMPLE 1-2 sentence visual description "
-                f"for an image of this exact moment. Focus on {char_name}'s appearance, current action, "
-                f"setting/background, and mood. Keep it simple and visual - only describe what can be seen. "
-                f"\n\nRespond with ONLY the image description, nothing else."
+    f"Generate a SIMPLE 1-2 sentence image description for the current roleplay scene. "
+    f"\n\n**STRICT RULES:**"
+    f"\n1. Show ONLY {char_name} - NO other people allowed"
+    f"\n2. {char_name} must be ALONE in the image"
+    f"\n3. DO NOT mention: user, traveler, partner, lover, person, man, woman, someone, anyone, companion, or any other person"
+    f"\n4. Focus on: {char_name}'s appearance, pose, expression, clothing, and the setting/background"
+    f"\n\nExample: '{char_name} sitting on velvet couch in candlelit room, wearing elegant dress, seductive smile'"
+    f"\n\nRespond with ONLY the image description, nothing else."
             )
         })
         
