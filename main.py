@@ -134,7 +134,7 @@ async def get_image_prompt_from_grok(session_history, char_name):
         prompt_messages.append({
             "role": "user",
             "content": (
-    f"Generate a SIMPLE 1-2 sentence image description for the current roleplay scene. "
+    f"Generate a SIMPLE 1-2 sentence image description for the current roleplay scene only. "
     f"\n\n**STRICT RULES:**"
     f"\n1. Show ONLY {char_name} - NO other people allowed"
     f"\n2. {char_name} must be ALONE in the image"
