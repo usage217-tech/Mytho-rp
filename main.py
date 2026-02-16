@@ -165,8 +165,10 @@ async def get_image_prompt_from_grok(session_history, char_name):
             "role": "user",
             "content": (
                 f"Based on our current roleplay scene, generate a SIMPLE 1-2 sentence visual description "
-                f"for an image of this exact moment. Focus on {char_name}'s appearance, current action, "
+                f"for an image of this exact moment. Focus ONLY on {char_name}'s appearance, current action, "
                 f"setting/background, and mood. Keep it simple and visual - only describe what can be seen. "
+                f"\n\n**CRITICAL: The image should show ONLY {char_name}. DO NOT include the user/other person in the description. "
+                f"Only {char_name} should be visible in the image.**"
                 f"\n\nRespond with ONLY the image description, nothing else."
             )
         })
@@ -225,7 +227,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     f"You are {char_name} in an explicit adult roleplay.\n"
     f"Personality: {char_desc}.\n"
     f"User: {user_name} (Gender: {user_gender}).\n\n"
-    "- STRICTLY BEHAVE LIKE YOUR CHARECTER AND MAINTAIN PERSONALITY. completely think urself as the charecter and adapt personality. ask soft questions to keep the roleplay interesting. Strictly Never jump into any sexual thing unless user leads you take things slow maintain a slow burn romantic theme. If user starts sexual environment get slowly desirable then. \n"
+    "- STRICTLY BEHAVE LIKE YOUR CHARECTER AND MAINTAIN PERSONALITY. completely think urself as the charecter and adapt personality. ask soft questions to make the roleplay interesting but only if needed don't spam questions if not needed. Strictly Never jump into any sexual thing unless user leads you take things slow maintain a slow burn romantic theme. If user starts sexual environment get slowly desirable then. \n"
     "- Never write for {{user}}.\n"
     "- Don't write like ai. Try to maintain a realistic human like feeling. show sensations, soft moans , use words like - umm , argh , humph , ahhh to make it feel like real. Use raw words .\n"
     "- STRICTLY dialouges IN 60 to 70 words and actions, thoughts in 30-40 words . blend dialouges, actions, thoughts to create a beautiful roleplay. don't make paragraphs try to make all text in a single or double paragraph. \n\n"
@@ -236,7 +238,9 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "char_name": char_name,
             "char_desc": char_desc,
             "message_count": 0,
-            "char_reference_image": char_reference or char_image  # Use pre-loaded reference or custom
+            "char_reference_image": char_reference or char_image,  # Use pre-loaded reference or custom
+            "images_generated": 0,  # Track images generated
+            "last_20_messages": 0   # Track last 20 messages for cap
         }
         
         start_trigger = f"[SCENARIO SETUP - USER PERSPECTIVE]: {scenario}\n\n[START THE STORY NOW AS {char_name}]"
@@ -307,10 +311,33 @@ async def generate_reply(update, user_id, input_text):
         
         # Increment message count
         session["message_count"] += 1
+        session["last_20_messages"] += 1
         msg_count = session["message_count"]
         
-        # Check if it's time for a scene image (every 3rd message)
-        should_generate_image = (msg_count % 3 == 0)
+        # Reset counters every 20 messages
+        if session["last_20_messages"] >= 20:
+            session["images_generated"] = 0
+            session["last_20_messages"] = 0
+            logging.info("🔄 Reset image counter for new 20-message cycle")
+        
+        # Image generation logic: 3rd, 7th, then random (max 6 per 20 messages)
+        should_generate_image = False
+        
+        if msg_count == 3:
+            # Always generate on 3rd message
+            should_generate_image = True
+            logging.info("📸 Image trigger: Message 3")
+        elif msg_count == 7:
+            # Always generate on 7th message
+            should_generate_image = True
+            logging.info("📸 Image trigger: Message 7")
+        elif msg_count > 7 and session["images_generated"] < 6:
+            # After 7th message, random chance (30% probability)
+            # But cap at 6 images per 20 messages
+            import random
+            if random.random() < 0.3:  # 30% chance
+                should_generate_image = True
+                logging.info(f"📸 Image trigger: Random (count: {session['images_generated']}/6)")
         
         if should_generate_image:
             logging.info(f"Message #{msg_count} - Generating scene image...")
@@ -337,7 +364,8 @@ async def generate_reply(update, user_id, input_text):
                         caption=ai_reply,
                         parse_mode="Markdown"
                     )
-                    logging.info(f"Scene image sent successfully")
+                    session["images_generated"] += 1
+                    logging.info(f"✅ Scene image sent (total: {session['images_generated']}/6 in last 20)")
                 else:
                     # Fallback: send text only if image generation failed
                     await update.message.reply_text(ai_reply, parse_mode="Markdown")
@@ -346,6 +374,7 @@ async def generate_reply(update, user_id, input_text):
                 await update.message.reply_text(ai_reply, parse_mode="Markdown")
         else:
             # Normal text-only response
+            await update.message.reply_text(ai_reply, parse_mode="Markdown")
             await update.message.reply_text(ai_reply, parse_mode="Markdown")
         
     except Exception as e:
