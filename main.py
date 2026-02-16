@@ -33,6 +33,18 @@ CHARACTER_VIDEOS = {
     "Mike": "https://usage217-tech.github.io/Charecter-mp4/Mike.mp4"
 }
 
+# --- CHARACTER REFERENCE IMAGES (for exact appearance in generated images) ---
+CHARACTER_REFERENCE_IMAGES = {
+    "Lilith": "https://i.postimg.cc/nLPJ8WTn/image-14.jpg",
+    "Hellien": "https://i.postimg.cc/Pr40sc5p/image-10.jpg",
+    "Mrs. Grace": "https://i.postimg.cc/dtqSBBmz/image-15.jpg",
+    "Maya": "https://i.postimg.cc/rs9ZT0cN/image-20.jpg",
+    "Nika": "https://i.postimg.cc/W4J93fT3/image-8.jpg",
+    "Robert": "https://i.postimg.cc/NFN8b1Qt/image-5.jpg",
+    "John": "https://i.postimg.cc/JhbbSwRb/image-6.jpg",
+    "Mike": "https://i.postimg.cc/pXTJr1Bj/image-7.jpg"
+}
+
 # Initialize Clients
 client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY)
 app = Flask(__name__)
@@ -55,7 +67,11 @@ def get_utility_keyboard():
 
 # --- IMAGE GENERATION ---
 def generate_scene_image(prompt_text, char_name="", char_desc="", reference_image_url=None):
-    """Generate scene image using Pollinations Klein model with API key and reference image."""
+    """Generate scene image using Pollinations Klein model with API key and reference image.
+    
+    Returns:
+        tuple: (image_bytes, image_url) - Both the downloaded image and the generation URL
+    """
     try:
         # Build the full prompt with character details
         if char_name and char_desc:
@@ -74,17 +90,22 @@ def generate_scene_image(prompt_text, char_name="", char_desc="", reference_imag
             import hashlib
             seed = int(hashlib.md5(char_name.encode()).hexdigest()[:8], 16) % 1000000
         
-        # Build Pollinations URL according to their API format
-        # https://gen.pollinations.ai/image/{prompt}?model=klein&width=1024&height=1024&seed=0&enhance=false&key=YOUR_API_KEY
+        # Build Pollinations URL with reference image support
         image_url = f"https://gen.pollinations.ai/image/{encoded_prompt}"
         params = [
             f"model=klein",
             f"width=1024",
             f"height=1024",
             f"seed={seed}",
-            f"enhance=false",  # Set to false as per API docs
+            f"enhance=false",
             f"key={POLLINATIONS_API_KEY}"
         ]
+        
+        # Add reference image if provided (for pre-loaded characters or custom with saved reference)
+        if reference_image_url:
+            encoded_reference = quote(reference_image_url)
+            params.append(f"reference={encoded_reference}")
+            logging.info(f"Using reference image: {reference_image_url[:50]}...")
         
         image_url += "?" + "&".join(params)
         
@@ -96,14 +117,14 @@ def generate_scene_image(prompt_text, char_name="", char_desc="", reference_imag
         if response.status_code == 200:
             image_bytes = BytesIO(response.content)
             logging.info("Image downloaded successfully")
-            return image_bytes
+            return (image_bytes, image_url)  # Return both bytes and URL
         else:
             logging.error(f"Image generation failed with status {response.status_code}")
-            return None
+            return (None, None)
         
     except Exception as e:
         logging.error(f"Image generation error: {e}")
-        return None
+        return (None, None)
 
 async def get_image_prompt_from_grok(session_history, char_name):
     """Ask Grok to generate a simple 1-2 line image prompt based on current scene."""
@@ -168,6 +189,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         scenario = data.get('scenario', 'A meeting in the dark.')
 
         char_video = CHARACTER_VIDEOS.get(char_name)
+        char_reference = CHARACTER_REFERENCE_IMAGES.get(char_name)  # Get reference image for pre-loaded characters
 
         system_prompt = (
     f"You are {char_name} in an explicit adult roleplay.\n"
@@ -184,7 +206,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "char_name": char_name,
             "char_desc": char_desc,
             "message_count": 0,
-            "char_reference_image": char_image  # Store for reference only
+            "char_reference_image": char_reference or char_image  # Use pre-loaded reference or custom image
         }
         
         start_trigger = f"[SCENARIO SETUP - USER PERSPECTIVE]: {scenario}\n\n[START THE STORY NOW AS {char_name}]"
@@ -205,12 +227,17 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Create initial image prompt
         initial_image_prompt = f"{scenario}, cinematic scene, detailed"
-        initial_scene_image = generate_scene_image(
+        initial_scene_image, initial_image_url = generate_scene_image(
             initial_image_prompt, 
             char_name=char_name,
             char_desc=char_desc,
-            reference_image_url=char_image
+            reference_image_url=char_reference or char_image  # Use reference for exact appearance
         )
+        
+        # For custom characters, save the first generated image URL as reference
+        if not char_reference and initial_image_url:
+            user_sessions[user_id]["char_reference_image"] = initial_image_url
+            logging.info(f"Saved first generated image as reference for custom character: {char_name}")
         
         if initial_scene_image:
             await update.message.reply_photo(
@@ -266,7 +293,7 @@ async def generate_reply(update, user_id, input_text):
             
             if image_prompt:
                 # Generate the scene image
-                scene_image_bytes = generate_scene_image(
+                scene_image_bytes, scene_image_url = generate_scene_image(
                     image_prompt,
                     char_name=session["char_name"],
                     char_desc=session["char_desc"],
