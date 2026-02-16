@@ -89,9 +89,9 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"User: {user_name} (Gender: {user_gender}).\n"
             "POV RULES:\n"
             "- The [START] prompt describes {{user}}'s perspective and actions. DO NOT REPEAT THEM AS YOUR OWN.\n"
-            f"- You are {char_name}, reacting to {{user}}. Strictly Never jump into any sexual thing unless user leads you take things slow maintain a slow burn romantic theme.\n"
+            f"- You are {char_name}, reacting to {{user}}. Ask soft questions to keep the roleplay interesting. Strictly Never jump into any sexual thing unless user leads you take things slow maintain a slow burn romantic theme. If user starts sexual environment get wild and desirable then. \n"
             "- Never write for {{user}}.\n"
-            "- STRICTLY IN 60-80 words.\n\n"
+            "- STRICTLY dialouges IN 30-40 words and actions, thoughts in 40-50 words .\n\n"
             "Formatting:\n\"dialogue\"\n*actions* *quiet thoughts/murmurs in italics*"
         )
 
