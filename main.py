@@ -73,13 +73,19 @@ def generate_scene_image(prompt_text, char_name="", char_desc="", reference_imag
         tuple: (image_bytes, image_url) - Both the image and the URL for reference storage
     """
     try:
-        # Build the full prompt with character details
-        if char_name and char_desc:
-            full_prompt = f"{char_name}, {char_desc}, {prompt_text}"
-        elif char_name:
-            full_prompt = f"{char_name}, {prompt_text}"
+        # Build the full prompt
+        # If we have a reference image, only use the scene description (Grok's prompt)
+        # Reference image handles character appearance
+        if reference_image_url:
+            full_prompt = prompt_text  # Just the scene from Grok
         else:
-            full_prompt = prompt_text
+            # No reference - need to describe character
+            if char_name and char_desc:
+                full_prompt = f"{char_name}, {char_desc}, {prompt_text}"
+            elif char_name:
+                full_prompt = f"{char_name}, {prompt_text}"
+            else:
+                full_prompt = prompt_text
         
         # URL encode the prompt
         encoded_prompt = quote(full_prompt)
@@ -125,22 +131,27 @@ def generate_scene_image(prompt_text, char_name="", char_desc="", reference_imag
         return (None, None)
 
 async def get_image_prompt_from_grok(session_history, char_name):
-    """Ask Grok to generate a simple 1-2 line image prompt based on current scene."""
+    """Ask Grok to generate a simple scene description for image generation with reference."""
     try:
         # Create a temporary message history for image prompt generation
         prompt_messages = session_history.copy()
         prompt_messages.append({
             "role": "user",
             "content": (
-                f"Create a visual image description for {char_name} ALONE."
-                f"\n\n**ABSOLUTE RULES - MUST FOLLOW:**"
-                f"\n1. {char_name} is COMPLETELY ALONE in the image - NO other people"
-                f"\n2. DO NOT use these words: user, traveler, partner, lover, person, man, woman, someone, anyone, companion, together, with, couple, two, both, they, them"
-                f"\n3. ONLY describe: {char_name}'s pose, expression, clothing, and the background/setting"
-                f"\n4. Keep it 1-2 sentences, simple and visual"
-                f"\n\n**GOOD example:** '{char_name} reclining on velvet couch in candlelit bedroom, wearing silk nightgown, seductive smile'"
-                f"\n**BAD example:** '{char_name} and user sitting together...'"
-                f"\n\nGenerate description (ONLY {char_name}, ALONE):"
+                f"Generate a simple image prompt for Pollinations AI that will use a reference image of {char_name}."
+                f"\n\n**IMPORTANT RULES:**"
+                f"\n1. DO NOT describe {char_name}'s appearance (hair, eyes, face, body) - the reference image handles that"
+                f"\n2. ONLY describe: the action/pose, setting/location, lighting, mood, and atmosphere"
+                f"\n3. {char_name} must be ALONE - no other people"
+                f"\n4. Keep it SHORT - just the scene details"
+                f"\n\n**GOOD examples:**"
+                f"\n- 'sitting on velvet couch, candlelit room, romantic atmosphere'"
+                f"\n- 'standing by window, moonlight, thoughtful pose'"
+                f"\n- 'reclining on bed, dim lighting, intimate setting'"
+                f"\n\n**BAD examples:**"
+                f"\n- 'woman with long dark hair...' (NO character description!)"
+                f"\n- 'together with user...' (NO other people!)"
+                f"\n\nGenerate ONLY the scene description:"
             )
         })
         
@@ -148,11 +159,11 @@ async def get_image_prompt_from_grok(session_history, char_name):
             model=MODEL,
             messages=prompt_messages,
             temperature=0.7,
-            max_tokens=100
+            max_tokens=80
         )
         
         image_prompt = response.choices[0].message.content.strip()
-        logging.info(f"Grok generated image prompt: {image_prompt}")
+        logging.info(f"Grok generated scene prompt: {image_prompt}")
         return image_prompt
         
     except Exception as e:
