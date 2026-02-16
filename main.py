@@ -33,6 +33,18 @@ CHARACTER_VIDEOS = {
     "Mike": "https://usage217-tech.github.io/Charecter-mp4/Mike.mp4"
 }
 
+# --- CHARACTER REFERENCE IMAGES (for exact appearance) ---
+CHARACTER_REFERENCE_IMAGES = {
+    "Lilith": "https://i.postimg.cc/nLPJ8WTn/image-14.jpg",
+    "Hellien": "https://i.postimg.cc/Pr40sc5p/image-10.jpg",
+    "Mrs. Grace": "https://i.postimg.cc/dtqSBBmz/image-15.jpg",
+    "Maya": "https://i.postimg.cc/rs9ZT0cN/image-20.jpg",
+    "Nika": "https://i.postimg.cc/W4J93fT3/image-8.jpg",
+    "Robert": "https://i.postimg.cc/NFN8b1Qt/image-5.jpg",
+    "John": "https://i.postimg.cc/JhbbSwRb/image-6.jpg",
+    "Mike": "https://i.postimg.cc/pXTJr1Bj/image-7.jpg"
+}
+
 # Initialize Clients
 client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY)
 app = Flask(__name__)
@@ -54,8 +66,12 @@ def get_utility_keyboard():
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 # --- IMAGE GENERATION ---
-def generate_scene_image(prompt_text, char_name="", char_desc=""):
-    """Generate scene image using Pollinations Klein model with API key."""
+def generate_scene_image(prompt_text, char_name="", char_desc="", reference_image_url=None):
+    """Generate scene image using Pollinations Klein model with API key and reference image.
+    
+    Returns:
+        tuple: (image_bytes, image_url) - Both the image and the URL for reference storage
+    """
     try:
         # Build the full prompt with character details
         if char_name and char_desc:
@@ -74,16 +90,22 @@ def generate_scene_image(prompt_text, char_name="", char_desc=""):
             import hashlib
             seed = int(hashlib.md5(char_name.encode()).hexdigest()[:8], 16) % 1000000
         
-        # Build Pollinations URL
+        # Build Pollinations URL with CORRECT image parameter
         image_url = f"https://gen.pollinations.ai/image/{encoded_prompt}"
         params = [
             f"model=klein",
             f"width=1024",
             f"height=1024",
             f"seed={seed}",
-            f"enhance=false",
+            f"enhance=true",  # Set to true for better quality
             f"key={POLLINATIONS_API_KEY}"
         ]
+        
+        # Add reference image if provided - CORRECT PARAMETER IS image= not reference=!
+        if reference_image_url:
+            encoded_reference = quote(reference_image_url)
+            params.append(f"image={encoded_reference}")  # ✅ CORRECT PARAMETER!
+            logging.info(f"✅ Using reference image: {reference_image_url[:50]}...")
         
         image_url += "?" + "&".join(params)
         
@@ -94,14 +116,74 @@ def generate_scene_image(prompt_text, char_name="", char_desc=""):
         
         if response.status_code == 200:
             image_bytes = BytesIO(response.content)
-            logging.info("Image generated successfully")
-            return image_bytes
+            logging.info("Image downloaded successfully")
+            return (image_bytes, image_url)  # Return both bytes and URL
         else:
             logging.error(f"Image generation failed with status {response.status_code}")
-            return None
+            return (None, None)
         
     except Exception as e:
         logging.error(f"Image generation error: {e}")
+        return (None, None)
+
+async def get_image_prompt_from_grok(session_history, char_name):
+    """Ask Grok to generate a simple 1-2 line image prompt based on current scene."""
+    try:
+        # Create a temporary message history for image prompt generation
+        prompt_messages = session_history.copy()
+        prompt_messages.append({
+            "role": "user",
+            "content": (
+                f"Based on our current roleplay scene, generate a SIMPLE 1-2 sentence visual description "
+                f"for an image of this exact moment. Focus on {char_name}'s appearance, current action, "
+                f"setting/background, and mood. Keep it simple and visual - only describe what can be seen. "
+                f"\n\nRespond with ONLY the image description, nothing else."
+            )
+        })
+        
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=prompt_messages,
+            temperature=0.7,
+            max_tokens=100
+        )
+        
+        image_prompt = response.choices[0].message.content.strip()
+        logging.info(f"Grok generated image prompt: {image_prompt}")
+        return image_prompt
+        
+    except Exception as e:
+        logging.error(f"Image prompt generation error: {e}")
+        return None
+
+async def get_image_prompt_from_grok(session_history, char_name):
+    """Ask Grok to generate a simple 1-2 line image prompt based on current scene."""
+    try:
+        # Create a temporary message history for image prompt generation
+        prompt_messages = session_history.copy()
+        prompt_messages.append({
+            "role": "user",
+            "content": (
+                f"Based on our current roleplay scene, generate a SIMPLE 1-2 sentence visual description "
+                f"for an image of this exact moment. Focus on {char_name}'s appearance, current action, "
+                f"setting/background, and mood. Keep it simple and visual - only describe what can be seen. "
+                f"\n\nRespond with ONLY the image description, nothing else."
+            )
+        })
+        
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=prompt_messages,
+            temperature=0.7,
+            max_tokens=100
+        )
+        
+        image_prompt = response.choices[0].message.content.strip()
+        logging.info(f"Grok generated image prompt: {image_prompt}")
+        return image_prompt
+        
+    except Exception as e:
+        logging.error(f"Image prompt generation error: {e}")
         return None
 
 # --- FLASK SERVER ---
@@ -137,6 +219,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         scenario = data.get('scenario', 'A meeting in the dark.')
 
         char_video = CHARACTER_VIDEOS.get(char_name)
+        char_reference = CHARACTER_REFERENCE_IMAGES.get(char_name)  # Get reference for pre-loaded
 
         system_prompt = (
     f"You are {char_name} in an explicit adult roleplay.\n"
@@ -151,7 +234,9 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_sessions[user_id] = {
             "history": [{"role": "system", "content": system_prompt}],
             "char_name": char_name,
-            "char_desc": char_desc
+            "char_desc": char_desc,
+            "message_count": 0,
+            "char_reference_image": char_reference or char_image  # Use pre-loaded reference or custom
         }
         
         start_trigger = f"[SCENARIO SETUP - USER PERSPECTIVE]: {scenario}\n\n[START THE STORY NOW AS {char_name}]"
@@ -167,47 +252,32 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logging.error(f"Video Error: {e}")
 
-        # 2. Character Image
+        # 2. Generate initial scene image based on scenario
         status_text = f"🌑 **Summoning {char_name}...** 🌙\n\n*The void shapes itself into a familiar form...*"
         
-        # Check if it's a pre-loaded character (has video) or custom
-        is_preloaded = char_name in CHARACTER_VIDEOS
+        # Create initial image prompt
+        initial_image_prompt = f"{scenario}, cinematic scene, detailed"
+        initial_scene_image, initial_image_url = generate_scene_image(
+            initial_image_prompt, 
+            char_name=char_name,
+            char_desc=char_desc,
+            reference_image_url=char_reference or char_image  # Use reference for pre-loaded, or custom image
+        )
         
-        if is_preloaded and char_image:
-            # Pre-loaded character: Show the pre-uploaded image from web app
-            logging.info(f"Pre-loaded character - using uploaded image")
+        # For custom characters (no pre-loaded reference), save first generated image URL as reference
+        if not char_reference and initial_image_url:
+            user_sessions[user_id]["char_reference_image"] = initial_image_url
+            logging.info(f"💾 Saved first generated image as reference for custom character")
+        
+        if initial_scene_image:
             await update.message.reply_photo(
-                photo=char_image,
+                photo=initial_scene_image,
                 caption=status_text,
                 reply_markup=get_utility_keyboard(),
                 parse_mode="Markdown"
             )
-        elif not is_preloaded:
-            # Custom character: Generate an image
-            logging.info(f"Custom character - generating image")
-            initial_image_prompt = f"{scenario}, cinematic scene, detailed"
-            generated_image = generate_scene_image(
-                initial_image_prompt, 
-                char_name=char_name,
-                char_desc=char_desc
-            )
-            
-            if generated_image:
-                await update.message.reply_photo(
-                    photo=generated_image,
-                    caption=status_text,
-                    reply_markup=get_utility_keyboard(),
-                    parse_mode="Markdown"
-                )
-            else:
-                # Fallback to text if generation fails
-                await update.message.reply_text(
-                    status_text, 
-                    reply_markup=get_utility_keyboard(), 
-                    parse_mode="Markdown"
-                )
         else:
-            # No image available
+            # Fallback to text if image generation fails
             await update.message.reply_text(
                 status_text, 
                 reply_markup=get_utility_keyboard(), 
@@ -235,8 +305,48 @@ async def generate_reply(update, user_id, input_text):
         ai_reply = response.choices[0].message.content
         session["history"].append({"role": "assistant", "content": ai_reply})
         
-        # Just send text response - no images
-        await update.message.reply_text(ai_reply, parse_mode="Markdown")
+        # Increment message count
+        session["message_count"] += 1
+        msg_count = session["message_count"]
+        
+        # Check if it's time for a scene image (every 3rd message)
+        should_generate_image = (msg_count % 3 == 0)
+        
+        if should_generate_image:
+            logging.info(f"Message #{msg_count} - Generating scene image...")
+            
+            # Get image prompt from Grok
+            image_prompt = await get_image_prompt_from_grok(
+                session["history"], 
+                session["char_name"]
+            )
+            
+            if image_prompt:
+                # Generate the scene image with reference
+                scene_image_bytes, scene_image_url = generate_scene_image(
+                    image_prompt,
+                    char_name=session["char_name"],
+                    char_desc=session["char_desc"],
+                    reference_image_url=session.get("char_reference_image")
+                )
+                
+                if scene_image_bytes:
+                    # Send text with scene image
+                    await update.message.reply_photo(
+                        photo=scene_image_bytes,
+                        caption=ai_reply,
+                        parse_mode="Markdown"
+                    )
+                    logging.info(f"Scene image sent successfully")
+                else:
+                    # Fallback: send text only if image generation failed
+                    await update.message.reply_text(ai_reply, parse_mode="Markdown")
+            else:
+                # Fallback: send text only if prompt generation failed
+                await update.message.reply_text(ai_reply, parse_mode="Markdown")
+        else:
+            # Normal text-only response
+            await update.message.reply_text(ai_reply, parse_mode="Markdown")
         
     except Exception as e:
         await update.message.reply_text(f"🌑 The void is silent (Error): {e}")
