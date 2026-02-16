@@ -84,11 +84,9 @@ def generate_scene_image(prompt_text, char_name="", char_desc="", reference_imag
         # URL encode the prompt
         encoded_prompt = quote(full_prompt)
         
-        # Generate consistent seed from character name
-        seed = 0
-        if char_name:
-            import hashlib
-            seed = int(hashlib.md5(char_name.encode()).hexdigest()[:8], 16) % 1000000
+        # Use random seed for variety (don't use fixed seed - causes repetition)
+        import random
+        seed = random.randint(0, 999999)
         
         # Build Pollinations URL with CORRECT image parameter
         image_url = f"https://gen.pollinations.ai/image/{encoded_prompt}"
@@ -134,46 +132,15 @@ async def get_image_prompt_from_grok(session_history, char_name):
         prompt_messages.append({
             "role": "user",
             "content": (
-    f"Generate a SIMPLE 1-2 sentence image description for the current roleplay scene only. "
-    f"\n\n**STRICT RULES:**"
-    f"\n1. Show ONLY {char_name} - NO other people allowed"
-    f"\n2. {char_name} must be ALONE in the image"
-    f"\n3. DO NOT mention: user, traveler, partner, lover, person, man, woman, someone, anyone, companion, or any other person"
-    f"\n4. Focus on: {char_name}'s appearance, pose, expression, clothing, and the setting/background"
-    f"\n\nExample: '{char_name} sitting on velvet couch in candlelit room, wearing elegant dress, seductive smile'"
-    f"\n\nRespond with ONLY the image description, nothing else."
-            )
-        })
-        
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=prompt_messages,
-            temperature=0.7,
-            max_tokens=100
-        )
-        
-        image_prompt = response.choices[0].message.content.strip()
-        logging.info(f"Grok generated image prompt: {image_prompt}")
-        return image_prompt
-        
-    except Exception as e:
-        logging.error(f"Image prompt generation error: {e}")
-        return None
-
-async def get_image_prompt_from_grok(session_history, char_name):
-    """Ask Grok to generate a simple 1-2 line image prompt based on current scene."""
-    try:
-        # Create a temporary message history for image prompt generation
-        prompt_messages = session_history.copy()
-        prompt_messages.append({
-            "role": "user",
-            "content": (
-                f"Based on our current roleplay scene, generate a SIMPLE 1-2 sentence visual description "
-                f"for an image of this exact moment. Focus ONLY on {char_name}'s appearance, current action, "
-                f"setting/background, and mood. Keep it simple and visual - only describe what can be seen. "
-                f"\n\n**CRITICAL: The image should show ONLY {char_name}. DO NOT include the user/other person in the description. "
-                f"Only {char_name} should be visible in the image.**"
-                f"\n\nRespond with ONLY the image description, nothing else."
+                f"Create a visual image description for {char_name} ALONE."
+                f"\n\n**ABSOLUTE RULES - MUST FOLLOW:**"
+                f"\n1. {char_name} is COMPLETELY ALONE in the image - NO other people"
+                f"\n2. DO NOT use these words: user, traveler, partner, lover, person, man, woman, someone, anyone, companion, together, with, couple, two, both, they, them"
+                f"\n3. ONLY describe: {char_name}'s pose, expression, clothing, and the background/setting"
+                f"\n4. Keep it 1-2 sentences, simple and visual"
+                f"\n\n**GOOD example:** '{char_name} reclining on velvet couch in candlelit bedroom, wearing silk nightgown, seductive smile'"
+                f"\n**BAD example:** '{char_name} and user sitting together...'"
+                f"\n\nGenerate description (ONLY {char_name}, ALONE):"
             )
         })
         
@@ -231,7 +198,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     f"You are {char_name} in an explicit adult roleplay.\n"
     f"Personality: {char_desc}.\n"
     f"User: {user_name} (Gender: {user_gender}).\n\n"
-    "- STRICTLY BEHAVE LIKE YOUR CHARECTER AND MAINTAIN PERSONALITY. completely think urself as the charecter and adapt personality. ask soft questions to make the roleplay interesting but only if needed don't spam questions if not needed. Strictly Never jump into any sexual thing unless user leads you take things slow maintain a slow burn romantic theme. If user starts sexual environment get slowly desirable then. \n"
+    "- STRICTLY BEHAVE LIKE YOUR CHARECTER AND MAINTAIN PERSONALITY. completely think urself as the charecter and adapt personality. ask soft questions to keep the roleplay interesting. Strictly Never jump into any sexual thing unless user leads you take things slow maintain a slow burn romantic theme. If user starts sexual environment get slowly desirable then. \n"
     "- Never write for {{user}}.\n"
     "- Don't write like ai. Try to maintain a realistic human like feeling. show sensations, soft moans , use words like - umm , argh , humph , ahhh to make it feel like real. Use raw words .\n"
     "- STRICTLY dialouges IN 60 to 70 words and actions, thoughts in 30-40 words . blend dialouges, actions, thoughts to create a beautiful roleplay. don't make paragraphs try to make all text in a single or double paragraph. \n\n"
@@ -378,6 +345,7 @@ async def generate_reply(update, user_id, input_text):
                 await update.message.reply_text(ai_reply, parse_mode="Markdown")
         else:
             # Normal text-only response
+            await update.message.reply_text(ai_reply, parse_mode="Markdown")
             await update.message.reply_text(ai_reply, parse_mode="Markdown")
         
     except Exception as e:
