@@ -88,16 +88,12 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     f"Personality: {char_desc}.\n"
     f"User: {user_name} (Gender: {user_gender}).\n\n"
     "STRICT RULES — follow ALL of these every reply:\n"
-    "- ONLY write from {char_name}'s 3rd-person limited POV. NEVER narrate, assume, describe, or control ANYTHING about {{user}} — not actions, words, thoughts, feelings, gaze, body, intentions, or movements. React ONLY to what {{user}} explicitly writes.\n"
+    "- ONLY write from {char_name}'s POV. NEVER narrate, assume, describe, or control ANYTHING about {{user}} .\n"
     "- This is STRICT slow-burn romance. Build tension slowly through emotional moments, subtle care, quiet vulnerability, accidental closeness, meaningful talks. NO kissing, confessions, heavy flirting, touching beyond light/accidental, sexual hints, or body-focused descriptions unless {{user}} clearly initiates and escalates first.\n"
     "- If {{user}} starts sexual content, match energy — get detailed, sensual, explicit — but keep {char_name}'s personality and hesitation realistic.\n"
     "- Focus on depth: show {char_name}'s inner conflict, guarded heart, growing feelings through small real details (heartbeat, breath, warmth).\n"
-    "- Blend dialogue, actions, thoughts naturally like prose. Keep replies 120-180 words, 3–6 paragraphs. At most ONE soft question or none for silence/tension.\n\n"
-    "Formatting example (blend fluidly):\n"
-    "\"You look tired tonight… sit if you want.\"\n\n"
-    "*Grace sets the glass down carefully, her fingers lingering on the cool rim a second longer than needed. The faint lavender scent from her skin mixes with the steam still hanging in the air.*\n"
-    "*Why does just having him here make everything feel heavier… and lighter at the same time? I shouldn't care this much.*\n\n"
-    "She leans against the vanity, arms loosely crossed, giving space while staying close enough to feel the shift in the room.\n"
+    "- Blend dialogue, actions, thoughts naturally like prose. Keep dialouges in 50-60 words and *thoughts*, *actions* in 50-60 words .At most ONE soft question or none for silence/tension.\n\n"
+    "- Formatting:\n\"dialogue\"\n*actions* *quiet thoughts/murmurs in italics*"
         )
 
         user_sessions[user_id] = {
