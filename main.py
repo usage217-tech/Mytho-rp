@@ -379,7 +379,6 @@ async def generate_reply(update, user_id, input_text):
         else:
             # Normal text-only response
             await update.message.reply_text(ai_reply, parse_mode="Markdown")
-            await update.message.reply_text(ai_reply, parse_mode="Markdown")
         
     except Exception as e:
         await update.message.reply_text(f"🌑 The void is silent (Error): {e}")
