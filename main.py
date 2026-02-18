@@ -175,53 +175,52 @@ def generate_scene_image(scene_description, char_name, reference_image_url=None)
         return (None, None)
 
 
-async def get_scene_description_from_grok(conversation_history, char_name):
+async def get_scene_description_from_grok(ai_reply, char_name):
     """
-    Ask Grok to generate a rich scene description (20-30 words).
-    Grok describes ONLY the scene — no character appearance.
-    The raw output is then wrapped by build_image_prompt() before sending to Pollinations.
+    Extract image keywords from Grok's OWN RP reply (not user message).
+    This runs AFTER the RP text is generated, so it has rich scene context.
+
+    RULE 1 — Interaction scene (2 people): extract background/setting only
+    RULE 2 — Character alone: extract pose + expression + background
 
     Returns:
-        str: Scene description like "sitting on velvet couch, warm candlelight casting soft
-             shadows, intimate bedroom, vintage decor in background, cinematic close-up shot,
-             romantic atmosphere"
+        str: Keyword string like "moonlight, garden, stone wall, roses, night sky"
     """
     try:
-        # Build prompt that tells Grok to describe the scene richly
-        prompt_messages = conversation_history.copy()
-        prompt_messages.append({
-            "role": "user",
-            "content": (
-                f"Extract image keywords from the last roleplay message for a photo of {char_name} ALONE.\n\n"
-                f"RULE 1 — If the text has TWO people interacting (touching, talking, eye contact):\n"
-                f"→ Extract ONLY background/setting keywords. Ignore all actions and poses.\n"
-                f"→ Example: 'moonlight, garden, stone wall, roses, night sky, silver glow'\n\n"
-                f"RULE 2 — If {char_name} is alone:\n"
-                f"→ Extract pose + expression + background keywords.\n"
-                f"→ Example: 'blushing, shy smile, standing, library, warm light'\n\n"
-                f"🚫 NEVER OUTPUT:\n"
-                f"- Interaction words (reaching, touching, looking at you, pinning, tracing)\n"
-                f"- Any hint of a 2nd person\n"
-                f"- Sentences or phrases — keywords only\n"
-                f"- More than 10 words\n\n"
-                f"✅ OUTPUT FORMAT:\n"
-                f"keyword, keyword, keyword, keyword, keyword\n\n"
-                f"Output keywords only, nothing else:"
-            )
-        })
+        prompt_messages = [
+            {
+                "role": "user",
+                "content": (
+                    f"Extract image keywords from this roleplay text for a photo of {char_name} ALONE.\n\n"
+                    f"ROLEPLAY TEXT:\n{ai_reply}\n\n"
+                    f"RULE 1 — If the text describes TWO people interacting (touching, talking, eye contact, any interaction):\n"
+                    f"→ Extract ONLY background/setting/lighting keywords. Completely ignore all actions and poses.\n"
+                    f"→ Example output: moonlight, garden, stone wall, roses, night sky, silver glow\n\n"
+                    f"RULE 2 — If {char_name} is alone in the text:\n"
+                    f"→ Extract pose + expression + background keywords.\n"
+                    f"→ Example output: blushing, shy smile, standing, library, warm golden light\n\n"
+                    f"🚫 NEVER OUTPUT:\n"
+                    f"- Interaction words (reaching, touching, looking at you, pinning, tracing, gazing at)\n"
+                    f"- Any hint of a 2nd person existing\n"
+                    f"- Sentences or full phrases\n"
+                    f"- More than 10 keywords\n\n"
+                    f"✅ OUTPUT FORMAT: keyword, keyword, keyword, keyword, keyword\n\n"
+                    f"Output keywords only, nothing else:"
+                )
+            }
+        ]
 
         response = client.chat.completions.create(
             model=MODEL,
             messages=prompt_messages,
-            temperature=0.7,
-            max_tokens=80
+            temperature=0.5,
+            max_tokens=60
         )
 
         scene_desc = response.choices[0].message.content.strip()
-        # Clean up any unwanted formatting
         scene_desc = scene_desc.replace('"', '').replace("'", "")
 
-        logging.info(f"📝 Grok raw scene: {scene_desc}")
+        logging.info(f"📝 Grok image keywords (from AI reply): {scene_desc}")
         return scene_desc
 
     except Exception as e:
@@ -364,9 +363,9 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Start slow & romantic. Only turn sexual if user starts it.\n"
             "Be flirty, seductive & playful.\n"
             "FORMATTING (strict - only these 3 things):\n"
-            'Dialogues: "Natural human talk with little questions, soft desires, and everyday feelings." (STRICTLY IN 50 words)\n'
-            "Actions: descriptive actions (STRICTLY IN 30 words)\n"
-            "Lil narration: short plain description (STRICTLY IN 30 words)\n"
+            'Dialogues: "Natural human talk with little questions, soft desires, and everyday feelings." (minimum 50 words)\n'
+            "Actions: descriptive actions (minimum 30 words)\n"
+            "Lil narration: short plain description (minimum 30 words)\n"
             "Everything in 1-2 flowing paragraphs only.\n\n"
             "Now begin the roleplay!"
         )
@@ -508,15 +507,15 @@ async def generate_reply(update, user_id, input_text):
         if should_generate_image_now(session):
             logging.info(f"🎨 Message #{session['message_count']} - Generating scene image...")
 
-            # Step 1: Grok generates raw scene description
+            # Step 1: Extract keywords from Grok's OWN reply (not user message)
+            # This is the correct order — RP text is already written above
             scene_desc = await get_scene_description_from_grok(
-                session["history"],
+                ai_reply,
                 session["char_name"]
             )
 
             if scene_desc:
-                # Step 2: Code wraps it into structured prompt → sent to Pollinations
-                # build_image_prompt() is called inside generate_scene_image()
+                # Step 2: Wrap keywords into structured prompt → send to Pollinations
                 scene_image_bytes, scene_image_url = generate_scene_image(
                     scene_description=scene_desc,
                     char_name=session["char_name"],
