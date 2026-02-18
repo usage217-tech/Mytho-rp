@@ -415,7 +415,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model=MODEL,
             messages=session["history"],
             temperature=0.85,
-            max_tokens=600
+            max_tokens=300
         )
 
         ai_reply = response.choices[0].message.content
@@ -493,7 +493,7 @@ async def generate_reply(update, user_id, input_text):
             model=MODEL,
             messages=session["history"],
             temperature=0.85,
-            max_tokens=600
+            max_tokens=300
         )
 
         ai_reply = response.choices[0].message.content
