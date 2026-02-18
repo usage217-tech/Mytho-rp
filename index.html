@@ -467,6 +467,52 @@
             background: rgba(255,255,255,0.05);
             margin: 16px;
         }
+
+        /* ===== STYLE TABS (Anime/Realistic) ===== */
+        .style-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            padding: 0 16px;
+            margin: 12px 0;
+        }
+
+        .style-tab-btn {
+            background: #111118;
+            border: 1.5px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 12px;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            transition: all 0.2s ease;
+        }
+
+        .style-tab-btn.active {
+            background: rgba(192,132,252,0.15);
+            border-color: var(--accent);
+            color: white;
+            font-weight: 600;
+        }
+
+        /* ===== IMAGE COLOR GLOW EFFECT ===== */
+        .char-card-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* Dynamic glow applied via JS based on dominant image color */
+        .char-card.has-glow {
+            box-shadow: 0 0 20px var(--glow-color);
+        }
+
+        .char-card.has-glow.selected {
+            box-shadow: 0 0 0 1px var(--accent), 0 0 30px var(--glow-color);
+        }
     </style>
 </head>
 <body>
@@ -491,6 +537,15 @@
                 <svg viewBox="0 0 24 24"><circle cx="10" cy="14" r="4"/><path d="M14 10l5-5M19 5h-4M19 5v4"/></svg>
                 <span>The King</span>
             </button>
+        </div>
+
+        <!-- Style Selection (Anime/Realistic) -->
+        <div id="style-section" style="display:none;">
+            <p class="section-title">Choose a style</p>
+            <div class="style-tabs">
+                <button class="style-tab-btn active" id="btn-realistic" onclick="setStyle('Realistic')">Realistic</button>
+                <button class="style-tab-btn" id="btn-anime" onclick="setStyle('Anime')">Anime</button>
+            </div>
         </div>
 
         <!-- Character Grid -->
@@ -586,26 +641,27 @@
         tg.expand();
 
         // ============================================================
-        // CHARACTER DATA (from web app)
+        // CHARACTER DATA
         // ============================================================
         const CHARACTERS = {
-            Female: [
-                {
-                    id: 'custom',
-                    name: "Your character",
-                    desc: "Will become any character you want.",
-                    isCustom: true,
-                    image: ""
-                },
-                {
-        "name": "Lilith",
-        "desc": "Ancient succubus with an alluring, mysterious aura and subtle seductive charm.",
-        "image": "https://i.postimg.cc/nLPJ8WTn/image-14.jpg",
-        "scenes": [
-            "In the dim light of the abandoned library, you notice a graceful figure browsing ancient tomes, her eyes meeting yours with a knowing smile.",
-            "During a late-night walk in the misty park, a elegant woman approaches, her voice soft and inviting as she asks for directions."
-        ]
-    },
+            Realistic: {
+                Female: [
+                    {
+                        id: 'custom',
+                        name: "Your character",
+                        desc: "Will become any character you want.",
+                        isCustom: true,
+                        image: ""
+                    },
+                    {
+                        "name": "Lilith",
+                        "desc": "Ancient succubus with an alluring, mysterious aura and subtle seductive charm.",
+                        "image": "https://i.postimg.cc/nLPJ8WTn/image-14.jpg",
+                        "scenes": [
+                            "In the dim light of the abandoned library, you notice a graceful figure browsing ancient tomes, her eyes meeting yours with a knowing smile.",
+                            "During a late-night walk in the misty park, a elegant woman approaches, her voice soft and inviting as she asks for directions."
+                        ]
+                    },
     {
         "name": "Hellien",
         "desc": "300-year-old vampire queen with elegant poise and a subtly captivating presence.",
@@ -642,16 +698,16 @@
             "During a family movie night, she sits close, providing comforting words and a soft blanket, her unspoken yearnings carefully veiled."
         ]
     }
-            ],
-            Male: [
-                {
-                    id: 'custom',
-                    name: "Your character",
-                    desc: "Will become any character you want.",
-                    isCustom: true,
-                    image: ""
-                },
-             {
+                ],
+                Male: [
+                    {
+                        id: 'custom',
+                        name: "Your character",
+                        desc: "Will become any character you want.",
+                        isCustom: true,
+                        image: ""
+                    },
+                    {
 "name": "Robert",
 "desc": "Dominant tech billionaire with a playboy lifestyle and commanding presence.",
 "image": "https://i.postimg.cc/NFN8b1Qt/image-5.jpg",
@@ -676,8 +732,89 @@
 "scenes": [
 "In the backyard during a sunny afternoon game, he teases you lightly with a grin, his playful energy filling the air.",
 "At home in the living room watching TV, he sits close, sharing laughs and inside jokes, his warmth subtly revealing deeper interests."]
-                }
-            ]
+                    }
+                ]
+            },
+            Anime: {
+                Female: [
+                    {
+                        id: 'custom',
+                        name: "Your character",
+                        desc: "Will become any character you want.",
+                        isCustom: true,
+                        image: ""
+                    },
+                    {
+                        "name": "Mia",
+                        "desc": "Cute anime girl with playful energy.",
+                        "image": "https://usage217-tech.github.io/Charecter-mp4/MIA.jpg",
+                        "scenes": []
+                    },
+                    {
+                        "name": "Velora",
+                        "desc": "Elegant anime beauty with mysterious charm.",
+                        "image": "https://usage217-tech.github.io/Charecter-mp4/VELORA.jpg",
+                        "scenes": []
+                    },
+                    {
+                        "name": "Caroline",
+                        "desc": "Sweet anime girl with gentle nature.",
+                        "image": "https://usage217-tech.github.io/Charecter-mp4/CAROLINE.jpg",
+                        "scenes": []
+                    },
+                    {
+                        "name": "Laura",
+                        "desc": "Charming anime character with bright personality.",
+                        "image": "https://usage217-tech.github.io/Charecter-mp4/LAURA.jpg",
+                        "scenes": []
+                    },
+                    {
+                        "name": "Bella",
+                        "desc": "Beautiful anime girl with enchanting aura.",
+                        "image": "https://usage217-tech.github.io/Charecter-mp4/BELLA.jpg",
+                        "scenes": []
+                    }
+                ],
+                Male: [
+                    {
+                        id: 'custom',
+                        name: "Your character",
+                        desc: "Will become any character you want.",
+                        isCustom: true,
+                        image: ""
+                    },
+                    {
+                        "name": "Arthur",
+                        "desc": "Noble anime warrior with strong presence.",
+                        "image": "https://usage217-tech.github.io/Charecter-mp4/ARTHUR.jpg",
+                        "scenes": []
+                    },
+                    {
+                        "name": "Tim",
+                        "desc": "Cool anime guy with laid-back attitude.",
+                        "image": "https://usage217-tech.github.io/Charecter-mp4/TIM.jpg",
+                        "scenes": []
+                    },
+                    {
+                        "name": "Joseph",
+                        "desc": "Charismatic anime character with confidence.",
+                        "image": "https://usage217-tech.github.io/Charecter-mp4/JOSEPH.jpg",
+                        "scenes": []
+                    },
+                    {
+                        "name": "Zenox",
+                        "desc": "Mysterious anime hero with hidden depths.",
+                        "image": "https://usage217-tech.github.io/Charecter-mp4/ZENOX.jpg",
+                        "scenes": []
+                    },
+                    {
+                        "name": "Anthony",
+                        "desc": "Handsome anime lead with charming smile.",
+                        "image": "https://usage217-tech.github.io/Charecter-mp4/ANTHONY.jpg",
+                        "scenes": []
+                    }
+                ]
+            }
         };
 
         // ============================================================
@@ -687,37 +824,106 @@
             charName: "",
             charDesc: "",
             userName: "",
+            currentStyle: "Realistic",  // Track current style
             userGender: "Male",
             scenario: "",
             imageUrl: ""
         };
 
         let currentScenes = [];
+        let currentGender = "";  // Track selected gender
 
         // ============================================================
-        // TAB SWITCHING + SCENE SUGGESTIONS
+        // STYLE SELECTION (Anime/Realistic)
         // ============================================================
+        function setStyle(style) {
+            selection.currentStyle = style;
+            document.getElementById('btn-realistic').classList.remove('active');
+            document.getElementById('btn-anime').classList.remove('active');
+            document.getElementById('btn-' + style.toLowerCase()).classList.add('active');
+            
+            renderCharGrid(currentGender, style);
+        }
+
+        // ============================================================
+        // EXTRACT DOMINANT COLOR FROM IMAGE
+        // ============================================================
+        function extractDominantColor(imgElement, callback) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = imgElement.naturalWidth || imgElement.width;
+            canvas.height = imgElement.naturalHeight || imgElement.height;
+            
+            ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
+            
+            try {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                let r = 0, g = 0, b = 0, count = 0;
+                
+                // Sample center area for better color
+                const startX = Math.floor(canvas.width * 0.3);
+                const endX = Math.floor(canvas.width * 0.7);
+                const startY = Math.floor(canvas.height * 0.3);
+                const endY = Math.floor(canvas.height * 0.7);
+                
+                for (let y = startY; y < endY; y += 5) {
+                    for (let x = startX; x < endX; x += 5) {
+                        const i = (y * canvas.width + x) * 4;
+                        r += data[i];
+                        g += data[i + 1];
+                        b += data[i + 2];
+                        count++;
+                    }
+                }
+                
+                r = Math.floor(r / count);
+                g = Math.floor(g / count);
+                b = Math.floor(b / count);
+                
+                callback(`rgba(${r}, ${g}, ${b}, 0.4)`);
+            } catch (e) {
+                // CORS or other error, use default purple
+                callback('rgba(192, 132, 252, 0.3)');
+            }
+        }
+
+        // ============================================================
+        // TAB SWITCHING
+        // ============================================================
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            document.getElementById('nav-' + tabId).classList.add('active');
+            window.scrollTo(0, 0);
+        }
 
         // ============================================================
         // AI GENDER SELECTION
         // ============================================================
         function setAiGender(gender) {
+            currentGender = gender;
             document.getElementById('btn-female').classList.remove('active');
             document.getElementById('btn-male').classList.remove('active');
             document.getElementById('btn-' + gender.toLowerCase()).classList.add('active');
 
-            renderCharGrid(gender);
+            // Show style selection tabs
+            document.getElementById('style-section').style.display = 'block';
+            
+            // Render with current style
+            renderCharGrid(gender, selection.currentStyle);
             document.getElementById('char-section').style.display = 'block';
         }
 
         // ============================================================
         // RENDER CHARACTER GRID
         // ============================================================
-        function renderCharGrid(gender) {
+        function renderCharGrid(gender, style = 'Realistic') {
             const grid = document.getElementById('char-grid');
             grid.innerHTML = '';
 
-            CHARACTERS[gender].forEach(c => {
+            CHARACTERS[style][gender].forEach(c => {
                 const card = document.createElement('div');
                 card.className = 'char-card fade-up';
                 card.dataset.charId = c.name;
@@ -733,13 +939,31 @@
                     `;
                 } else {
                     card.innerHTML = `
-                        <img src="${c.image}" class="char-card-img" loading="lazy" />
+                        <img src="${c.image}" class="char-card-img" loading="lazy" crossorigin="anonymous" />
                         <div class="char-card-overlay">
                             <div class="char-card-name">${c.name}</div>
                             <div class="char-card-desc">${c.desc}</div>
                         </div>
                         <div class="select-ring"></div>
                     `;
+                    
+                    // Extract dominant color from image for glow effect
+                    if (c.image) {
+                        const img = card.querySelector('.char-card-img');
+                        img.onload = () => {
+                            extractDominantColor(img, (color) => {
+                                card.style.setProperty('--glow-color', color);
+                                card.classList.add('has-glow');
+                            });
+                        };
+                        // If image already loaded
+                        if (img.complete) {
+                            extractDominantColor(img, (color) => {
+                                card.style.setProperty('--glow-color', color);
+                                card.classList.add('has-glow');
+                            });
+                        }
+                    }
                 }
 
                 card.onclick = () => selectChar(c, card);
@@ -788,6 +1012,7 @@
         // ============================================================
         // POPULATE SCENE SUGGESTIONS (when scenario tab opens)
         // ============================================================
+        const origSwitchTab = switchTab;
         function switchTab(tabId) {
             if (tabId === 'scenario' && currentScenes.length > 0) {
                 const container = document.getElementById('scene-suggestions');
@@ -854,4 +1079,4 @@
         };
     </script>
 </body>
-                        </html>
+                </html>
