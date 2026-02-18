@@ -363,9 +363,9 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Start slow & romantic. Only turn sexual if user starts it.\n"
             "Be flirty, seductive & playful.\n"
             "FORMATTING (strict - only these 3 things):\n"
-            'Dialogues: "Natural human talk with little questions, soft desires, and everyday feelings." (minimum 50 words)\n'
-            "Actions: descriptive actions (minimum 30 words)\n"
-            "Lil narration: short plain description (minimum 30 words)\n"
+            'Dialogues: "Natural human talk with little questions, soft desires, and everyday feelings." (minimum 50 words, maximum 70 words)\n'
+            "Actions: descriptive actions (minimum 30 words, maximum 40 words)\n"
+            "Lil narration: short plain description (minimum 30 words, maximum 40 words)\n"
             "Everything in 1-2 flowing paragraphs only.\n\n"
             "Now begin the roleplay!"
         )
@@ -415,40 +415,55 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model=MODEL,
             messages=session["history"],
             temperature=0.85,
-            max_tokens=800
+            max_tokens=600
         )
 
         ai_reply = response.choices[0].message.content
         session["history"].append({"role": "assistant", "content": ai_reply})
 
-        # 3. Generate initial scene image
-        # Grok generates raw scene description → code wraps it → sent to Pollinations
-        initial_scene_desc = f"{scenario}, cinematic scene, atmospheric"
-        initial_scene_image, initial_image_url = generate_scene_image(
-            scene_description=initial_scene_desc,
-            char_name=char_name,
-            reference_image_url=final_reference
-        )
+        # 3. Starting image logic:
+        # Preloaded characters → send reference image directly (no AI generation)
+        # Custom characters → generate AI image for the opening scene
 
-        # For custom characters, save first generated image URL as reference
-        if not char_reference and initial_image_url:
-            session["char_reference_image"] = initial_image_url
-            logging.info("💾 Saved first generated image as reference for custom character")
+        if char_reference:
+            # Preloaded character — use their reference image as the opening visual
+            logging.info(f"🖼️ Using preloaded reference image for {char_name}")
+            if initial_image_url := char_reference:
+                session["char_reference_image"] = char_reference
 
-        # 4. Send combined: image + AI's first message (ONLY ONE message sent)
-        if initial_scene_image:
             await update.message.reply_photo(
-                photo=initial_scene_image,
+                photo=char_reference,
                 caption=ai_reply,
                 reply_markup=get_utility_keyboard(),
                 parse_mode="Markdown"
             )
         else:
-            await update.message.reply_text(
-                ai_reply,
-                reply_markup=get_utility_keyboard(),
-                parse_mode="Markdown"
+            # Custom character — generate AI image for opening scene
+            initial_scene_desc = f"{scenario}, cinematic scene, atmospheric"
+            initial_scene_image, initial_image_url = generate_scene_image(
+                scene_description=initial_scene_desc,
+                char_name=char_name,
+                reference_image_url=final_reference
             )
+
+            # Save first generated image URL as reference for future images
+            if initial_image_url:
+                session["char_reference_image"] = initial_image_url
+                logging.info("💾 Saved first generated image as reference for custom character")
+
+            if initial_scene_image:
+                await update.message.reply_photo(
+                    photo=initial_scene_image,
+                    caption=ai_reply,
+                    reply_markup=get_utility_keyboard(),
+                    parse_mode="Markdown"
+                )
+            else:
+                await update.message.reply_text(
+                    ai_reply,
+                    reply_markup=get_utility_keyboard(),
+                    parse_mode="Markdown"
+                )
 
         # Initialize message counter (this was the first message)
         session["message_count"] = 1
@@ -478,7 +493,7 @@ async def generate_reply(update, user_id, input_text):
             model=MODEL,
             messages=session["history"],
             temperature=0.85,
-            max_tokens=800
+            max_tokens=600
         )
 
         ai_reply = response.choices[0].message.content
