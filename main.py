@@ -74,6 +74,9 @@ CHARACTER_REFERENCE_IMAGES = {
     "Anthony": "https://usage217-tech.github.io/Charecter-mp4/ANTHONY.jpg"
 }
 
+# Anime characters set for style detection
+ANIME_CHARACTERS = {"Mia", "Velora", "Caroline", "Laura", "Bella", "Arthur", "Tim", "Joseph", "Zenox", "Anthony"}
+
 # ============================================================================
 # INITIALIZE SERVICES
 # ============================================================================
@@ -86,20 +89,52 @@ user_sessions = {}
 # IMAGE GENERATION SYSTEM
 # ============================================================================
 
-def generate_scene_image(scene_description, reference_image_url=None):
+def get_character_style(char_name):
+    """
+    Returns 'Anime' for anime characters, 'Realistic' for all others.
+    """
+    if char_name in ANIME_CHARACTERS:
+        return "Anime"
+    return "Realistic"
+
+
+def build_image_prompt(grok_scene_description, char_name):
+    """
+    Wraps Grok's raw scene description into the final structured image prompt.
+
+    Structure: "[Style] style. [Grok scene description]. Using the reference image."
+
+    Args:
+        grok_scene_description: Raw scene description from Grok (pose, setting, lighting, etc.)
+        char_name: Character name to determine Anime or Realistic style
+
+    Returns:
+        str: Final structured prompt ready for Pollinations
+    """
+    style = get_character_style(char_name)
+    final_prompt = f"{style} style. {grok_scene_description}. Using the reference image."
+    logging.info(f"🖼️ Image prompt built: {final_prompt}")
+    return final_prompt
+
+
+def generate_scene_image(scene_description, char_name, reference_image_url=None):
     """
     Generate image using Pollinations Klein API.
 
     Args:
-        scene_description: Pure scene description (NO character details)
+        scene_description: Raw scene description from Grok (NO character details)
+        char_name: Character name (used to determine Anime/Realistic style)
         reference_image_url: Character reference image URL
 
     Returns:
         tuple: (image_bytes, image_url) or (None, None) on failure
     """
     try:
-        # Use ONLY scene description in prompt (reference handles character)
-        encoded_prompt = quote(scene_description)
+        # Build the structured prompt: Style + Grok description + Reference instruction
+        final_prompt = build_image_prompt(scene_description, char_name)
+
+        # Encode for URL
+        encoded_prompt = quote(final_prompt)
 
         # Random seed for variety
         seed = random.randint(0, 999999)
@@ -122,7 +157,7 @@ def generate_scene_image(scene_description, reference_image_url=None):
             logging.info(f"✅ Using reference: {reference_image_url[:60]}...")
 
         final_url = image_url + "?" + "&".join(params)
-        logging.info(f"🎨 Generating image: {scene_description[:60]}... (seed: {seed})")
+        logging.info(f"🎨 Generating image with prompt: {final_prompt[:80]}... (seed: {seed})")
 
         # Download generated image
         response = requests.get(final_url, timeout=30)
@@ -142,34 +177,36 @@ def generate_scene_image(scene_description, reference_image_url=None):
 
 async def get_scene_description_from_grok(conversation_history, char_name):
     """
-    Ask Grok to generate ONLY scene description (no character appearance).
-    This works with reference images - reference handles character look.
+    Ask Grok to generate a rich scene description (20-30 words).
+    Grok describes ONLY the scene — no character appearance.
+    The raw output is then wrapped by build_image_prompt() before sending to Pollinations.
 
     Returns:
-        str: Scene description like "sitting on couch, candlelit room, romantic mood"
+        str: Scene description like "sitting on velvet couch, warm candlelight casting soft
+             shadows, intimate bedroom, vintage decor in background, cinematic close-up shot,
+             romantic atmosphere"
     """
     try:
-        # Build prompt that explicitly tells Grok to ONLY describe scene
+        # Build prompt that tells Grok to describe the scene richly
         prompt_messages = conversation_history.copy()
         prompt_messages.append({
             "role": "user",
             "content": (
-                f"Generate a SHORT scene description for an image of {char_name}.\n\n"
-                f"🚫 DO NOT DESCRIBE:\n"
-                f"- {char_name}'s appearance (hair, face, body, clothing)\n"
-                f"- Any character physical details\n"
-                f"- The user or any other person\n\n"
-                f"✅ ONLY DESCRIBE:\n"
-                f"- {char_name}'s pose/action (sitting, standing, leaning, etc.)\n"
-                f"- Setting/location (bedroom, couch, window, etc.)\n"
-                f"- Lighting/atmosphere (candlelit, moonlight, dim, etc.)\n"
-                f"- Mood/vibe (romantic, mysterious, intimate, etc.)\n\n"
-                f"Keep it 5-10 words maximum. Just the scene essentials.\n\n"
-                f"Examples:\n"
-                f"- 'reclining on bed, dim lighting, intimate mood'\n"
-                f"- 'standing by window, moonlight, thoughtful pose'\n"
-                f"- 'sitting on couch, candlelit room, seductive atmosphere'\n\n"
-                f"Generate scene description:"
+                f"Extract image keywords from the last roleplay message for a photo of {char_name} ALONE.\n\n"
+                f"RULE 1 — If the text has TWO people interacting (touching, talking, eye contact):\n"
+                f"→ Extract ONLY background/setting keywords. Ignore all actions and poses.\n"
+                f"→ Example: 'moonlight, garden, stone wall, roses, night sky, silver glow'\n\n"
+                f"RULE 2 — If {char_name} is alone:\n"
+                f"→ Extract pose + expression + background keywords.\n"
+                f"→ Example: 'blushing, shy smile, standing, library, warm light'\n\n"
+                f"🚫 NEVER OUTPUT:\n"
+                f"- Interaction words (reaching, touching, looking at you, pinning, tracing)\n"
+                f"- Any hint of a 2nd person\n"
+                f"- Sentences or phrases — keywords only\n"
+                f"- More than 10 words\n\n"
+                f"✅ OUTPUT FORMAT:\n"
+                f"keyword, keyword, keyword, keyword, keyword\n\n"
+                f"Output keywords only, nothing else:"
             )
         })
 
@@ -177,14 +214,14 @@ async def get_scene_description_from_grok(conversation_history, char_name):
             model=MODEL,
             messages=prompt_messages,
             temperature=0.7,
-            max_tokens=50
+            max_tokens=80
         )
 
         scene_desc = response.choices[0].message.content.strip()
         # Clean up any unwanted formatting
         scene_desc = scene_desc.replace('"', '').replace("'", "")
 
-        logging.info(f"📝 Grok scene: {scene_desc}")
+        logging.info(f"📝 Grok raw scene: {scene_desc}")
         return scene_desc
 
     except Exception as e:
@@ -310,6 +347,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.info(f"🎭 Manifesting: {char_name} for user {user_name}")
         logging.info(f"📝 Scenario: {scenario[:60]}...")
         logging.info(f"🖼️ Reference: {final_reference[:60] if final_reference else 'None'}")
+        logging.info(f"🎨 Style: {get_character_style(char_name)}")
 
         # ========================================
         # BUILD GROK SYSTEM PROMPT
@@ -326,9 +364,9 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Start slow & romantic. Only turn sexual if user starts it.\n"
             "Be flirty, seductive & playful.\n"
             "FORMATTING (strict - only these 3 things):\n"
-            'Dialogues: "Natural human talk with little questions, soft desires, and everyday feelings." (In 50 words)\n'
-            "Actions: descriptive actions ( In 30 words)\n"
-            "Lil narration: short plain description ( In 30 words)\n"
+            'Dialogues: "Natural human talk with little questions, soft desires, and everyday feelings." (STRICTLY IN 50 words)\n'
+            "Actions: descriptive actions (STRICTLY IN 30 words)\n"
+            "Lil narration: short plain description (STRICTLY IN 30 words)\n"
             "Everything in 1-2 flowing paragraphs only.\n\n"
             "Now begin the roleplay!"
         )
@@ -348,7 +386,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "last_20_messages": 0
         }
 
-        session = user_sessions[user_id]  # ✅ FIX: Define session AFTER creating it
+        session = user_sessions[user_id]
 
         # ========================================
         # SEND INITIAL CONTENT
@@ -385,8 +423,11 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         session["history"].append({"role": "assistant", "content": ai_reply})
 
         # 3. Generate initial scene image
+        # Grok generates raw scene description → code wraps it → sent to Pollinations
+        initial_scene_desc = f"{scenario}, cinematic scene, atmospheric"
         initial_scene_image, initial_image_url = generate_scene_image(
-            scene_description=f"{scenario}, cinematic scene, atmospheric",
+            scene_description=initial_scene_desc,
+            char_name=char_name,
             reference_image_url=final_reference
         )
 
@@ -467,16 +508,18 @@ async def generate_reply(update, user_id, input_text):
         if should_generate_image_now(session):
             logging.info(f"🎨 Message #{session['message_count']} - Generating scene image...")
 
-            # Get scene description from Grok
+            # Step 1: Grok generates raw scene description
             scene_desc = await get_scene_description_from_grok(
                 session["history"],
                 session["char_name"]
             )
 
             if scene_desc:
-                # Generate image with scene + reference
+                # Step 2: Code wraps it into structured prompt → sent to Pollinations
+                # build_image_prompt() is called inside generate_scene_image()
                 scene_image_bytes, scene_image_url = generate_scene_image(
                     scene_description=scene_desc,
+                    char_name=session["char_name"],
                     reference_image_url=session.get("char_reference_image")
                 )
 
