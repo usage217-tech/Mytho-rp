@@ -326,9 +326,9 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Start slow & romantic. Only turn sexual if user starts it.\n"
             "Be flirty, seductive & playful.\n"
             "FORMATTING (strict - only these 3 things):\n"
-            'Dialogues: "Natural human talk with little questions, soft desires, and everyday feelings." (max 50 words)\n'
-            "Actions: descriptive actions (max 30 words)\n"
-            "Lil narration: short plain description (max 30 words)\n"
+            'Dialogues: "Natural human talk with little questions, soft desires, and everyday feelings." (In 50 words)\n'
+            "Actions: descriptive actions ( In 30 words)\n"
+            "Lil narration: short plain description ( In 30 words)\n"
             "Everything in 1-2 flowing paragraphs only.\n\n"
             "Now begin the roleplay!"
         )
