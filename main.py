@@ -47,14 +47,31 @@ CHARACTER_VIDEOS = {
 }
 
 CHARACTER_REFERENCE_IMAGES = {
+    # Realistic Female Characters
     "Lilith": "https://i.postimg.cc/nLPJ8WTn/image-14.jpg",
     "Hellien": "https://i.postimg.cc/Pr40sc5p/image-10.jpg",
     "Mrs. Grace": "https://i.postimg.cc/dtqSBBmz/image-15.jpg",
     "Maya": "https://i.postimg.cc/rs9ZT0cN/image-20.jpg",
     "Nika": "https://i.postimg.cc/W4J93fT3/image-8.jpg",
+    
+    # Realistic Male Characters
     "Robert": "https://i.postimg.cc/NFN8b1Qt/image-5.jpg",
     "John": "https://i.postimg.cc/JhbbSwRb/image-6.jpg",
-    "Mike": "https://i.postimg.cc/pXTJr1Bj/image-7.jpg"
+    "Mike": "https://i.postimg.cc/pXTJr1Bj/image-7.jpg",
+    
+    # Anime Female Characters
+    "Mia": "https://usage217-tech.github.io/Charecter-mp4/MIA.jpg",
+    "Velora": "https://usage217-tech.github.io/Charecter-mp4/VELORA.jpg",
+    "Caroline": "https://usage217-tech.github.io/Charecter-mp4/CAROLINE.jpg",
+    "Laura": "https://usage217-tech.github.io/Charecter-mp4/LAURA.jpg",
+    "Bella": "https://usage217-tech.github.io/Charecter-mp4/BELLA.jpg",
+    
+    # Anime Male Characters
+    "Arthur": "https://usage217-tech.github.io/Charecter-mp4/ARTHUR.jpg",
+    "Tim": "https://usage217-tech.github.io/Charecter-mp4/TIM.jpg",
+    "Joseph": "https://usage217-tech.github.io/Charecter-mp4/JOSEPH.jpg",
+    "Zenox": "https://usage217-tech.github.io/Charecter-mp4/ZENOX.jpg",
+    "Anthony": "https://usage217-tech.github.io/Charecter-mp4/ANTHONY.jpg"
 }
 
 # ============================================================================
