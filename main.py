@@ -2,10 +2,19 @@
 HERMAX ROLEPLAY BOT
 Integrates: Telegram Bot + Web App + Grok AI + Pollinations Image Generation
 Character data loaded from characters.json
+
+Two Grok clients:
+  client_rp    — OPENROUTER_KEY        — RP text generation
+  client_img   — OPENROUTER_KEY_IMAGE  — keyword extraction (parallel)
+
+Image triggers:
+  Preloaded characters : message 3, 7, then 30% random (max 6 per 20)
+  Custom characters    : message 1, 3, 7, then 30% random (max 6 per 20)
 """
 
 import os
 import json
+import asyncio
 import logging
 import random
 import requests
@@ -25,11 +34,12 @@ from dotenv import load_dotenv
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
-POLLINATIONS_API_KEY = os.getenv("POLLINATIONS_API_KEY")
-WEBAPP_URL = "https://usage217-tech.github.io/Mytho-rp/"
-MODEL = "x-ai/grok-4.1-fast"
+TOKEN                = os.getenv("TELEGRAM_BOT_TOKEN")
+OPENROUTER_KEY       = os.getenv("OPENROUTER_KEY")
+OPENROUTER_KEY_IMAGE = os.getenv("OPENROUTER_KEY_IMAGE")
+POLLINATIONS_KEY     = os.getenv("POLLINATIONS_API_KEY")
+WEBAPP_URL           = "https://usage217-tech.github.io/Mytho-rp/"
+MODEL                = "x-ai/grok-4.1-fast"
 
 # ============================================================================
 # LOAD CHARACTER DATA
@@ -46,45 +56,61 @@ def is_anime(name):
     return char and char.get("style", "Realistic") == "Anime"
 
 # ============================================================================
-# INITIALIZE SERVICES
+# INITIALIZE SERVICES — TWO SEPARATE GROK CLIENTS
 # ============================================================================
 
-client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY)
-app = Flask(__name__)
+client_rp  = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY)
+client_img = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY_IMAGE)
+app        = Flask(__name__)
 user_sessions = {}
 
 # ============================================================================
-# IMAGE GENERATION
+# KEYBOARDS
+# ============================================================================
+
+def start_keyboard():
+    return ReplyKeyboardMarkup([
+        [KeyboardButton("✨ Begin Your Story", web_app=WebAppInfo(url=WEBAPP_URL))],
+        [KeyboardButton("🌸 How It Works")]
+    ], resize_keyboard=True)
+
+def utility_keyboard():
+    return ReplyKeyboardMarkup([
+        [KeyboardButton("💭 Current Story"), KeyboardButton("🌙 End Dream")],
+        [KeyboardButton("🌸 New Story"),     KeyboardButton("🎭 Who Am I?")]
+    ], resize_keyboard=True)
+
+# ============================================================================
+# IMAGE GENERATION — 720x720, klein model, enhance=true
 # ============================================================================
 
 def build_image_prompt(scene_keywords, char_name):
-    style = "Anime" if is_anime(char_name) else "Realistic"
+    style  = "Anime" if is_anime(char_name) else "Realistic"
     prompt = f"{style} style. {scene_keywords}. Using the reference image."
     logging.info(f"🖼️ Image prompt: {prompt}")
     return prompt
 
 def generate_scene_image(scene_keywords, char_name, reference_image_url=None):
     try:
-        final_prompt = build_image_prompt(scene_keywords, char_name)
-        encoded_prompt = quote(final_prompt)
-        seed = random.randint(0, 999999)
+        encoded_prompt = quote(build_image_prompt(scene_keywords, char_name))
+        seed           = random.randint(0, 999999)
 
-        image_url = f"https://gen.pollinations.ai/image/{encoded_prompt}"
-        params = [
+        base_url = f"https://gen.pollinations.ai/image/{encoded_prompt}"
+        params   = [
             "model=klein",
-            "width=1024",
-            "height=1024",
+            "width=720",
+            "height=720",
             f"seed={seed}",
             "enhance=true",
-            f"key={POLLINATIONS_API_KEY}"
+            f"key={POLLINATIONS_KEY}"
         ]
 
         if reference_image_url:
             params.append(f"image={quote(reference_image_url)}")
-            logging.info(f"✅ Reference: {reference_image_url[:60]}...")
+            logging.info(f"🔗 Reference: {reference_image_url[:60]}...")
 
-        final_url = image_url + "?" + "&".join(params)
-        response = requests.get(final_url, timeout=30)
+        final_url = base_url + "?" + "&".join(params)
+        response  = requests.get(final_url, timeout=45)
 
         if response.status_code == 200:
             logging.info("✅ Image generated successfully")
@@ -97,37 +123,52 @@ def generate_scene_image(scene_keywords, char_name, reference_image_url=None):
         logging.error(f"❌ Image error: {e}")
         return (None, None)
 
-async def get_scene_keywords(ai_reply, char_name):
+# ============================================================================
+# KEYWORD EXTRACTOR — client_img (separate key), last 5 messages context
+# ============================================================================
+
+async def get_scene_keywords(recent_messages, char_name):
     """
-    Extracts image keywords from Grok's OWN RP reply.
-    Only called when image trigger fires — never on every message.
+    Fires in PARALLEL with RP reply using client_img (separate Grok key).
+    Reads last 5 messages for full scene context.
+    Outputs exactly 6 comma-separated visual phrases.
     """
     try:
-        response = client.chat.completions.create(
+        context = "\n".join([
+            f"{m['role'].upper()}: {m['content']}"
+            for m in recent_messages[-5:]
+            if m['role'] != 'system'
+        ])
+
+        response = client_img.chat.completions.create(
             model=MODEL,
             messages=[{
                 "role": "user",
                 "content": (
-                    f"Extract image keywords from this roleplay text for a solo photo of {char_name}.\n\n"
-                    f"TEXT:\n{ai_reply}\n\n"
-                    f"RULE 1 — Two people interacting (touching, talking, eye contact):\n"
-                    f"→ Extract ONLY background/setting/lighting. Ignore all actions.\n"
-                    f"→ Example: moonlight, garden, stone wall, roses, silver glow\n\n"
-                    f"RULE 2 — {char_name} is alone:\n"
-                    f"→ Extract pose + expression + background.\n"
-                    f"→ Example: blushing, shy smile, standing, library, warm light\n\n"
-                    f"NEVER: interaction words, 2nd person hints, sentences, more than 10 keywords.\n"
-                    f"Output format: keyword, keyword, keyword\n"
-                    f"Output keywords only:"
+                    f"You are a visual scene extractor for image generation.\n\n"
+                    f"Read these recent roleplay messages carefully:\n\n"
+                    f"{context}\n\n"
+                    f"Extract exactly 6 comma-separated words or short phrases describing:\n"
+                    f"- The background and location\n"
+                    f"- The lighting and atmosphere\n"
+                    f"- What {char_name} is doing or expressing ALONE\n\n"
+                    f"STRICT RULES:\n"
+                    f"- No interaction words (kissing, touching, holding, teaching)\n"
+                    f"- No second person (you, your, together, each other)\n"
+                    f"- Character actions must be solo only (finger in mouth, hands on hips, playful smirk)\n"
+                    f"- No emotion words (passionate, desire) — show through pose/expression instead\n\n"
+                    f"GOOD: moonlit garden, ivy wall, silver light, finger in mouth, playful gaze\n"
+                    f"GOOD: swimming pool, bright lights, playful smirk, hands on hips\n"
+                    f"BAD: kissing, holding you, passionate, together, touching each other\n\n"
+                    f"Output exactly 6 comma-separated phrases. Nothing else."
                 )
             }],
             temperature=0.5,
-            max_tokens=30
+            max_tokens=40
         )
 
-        keywords = response.choices[0].message.content.strip()
-        keywords = keywords.replace('"', '').replace("'", "")
-        logging.info(f"📝 Scene keywords: {keywords}")
+        keywords = response.choices[0].message.content.strip().replace('"', '').replace("'", '')
+        logging.info(f"📝 Keywords: {keywords}")
         return keywords
 
     except Exception as e:
@@ -136,73 +177,58 @@ async def get_scene_keywords(ai_reply, char_name):
 
 # ============================================================================
 # IMAGE TRIGGER LOGIC
+# Preloaded : msg 3, 7, then 30% random (max 6 per 20)
+# Custom    : msg 1, 3, 7, then 30% random (max 6 per 20)
 # ============================================================================
 
 def should_generate_image(session):
-    count = session["message_count"]
-    generated = session["images_generated"]
+    count        = session["message_count"]
+    generated    = session["images_generated"]
+    is_preloaded = session["is_preloaded"]
 
+    if not is_preloaded and count == 1:
+        logging.info("📸 Trigger: Custom msg 1"); return True
     if count == 3:
-        logging.info("📸 Trigger: Message 3")
-        return True
+        logging.info("📸 Trigger: msg 3"); return True
     if count == 7:
-        logging.info("📸 Trigger: Message 7")
-        return True
-    if count > 7 and generated < 6:
-        if random.random() < 0.3:
-            logging.info(f"📸 Trigger: Random ({generated}/6)")
-            return True
+        logging.info("📸 Trigger: msg 7"); return True
+    if count > 7 and generated < 6 and random.random() < 0.3:
+        logging.info(f"📸 Trigger: random ({generated}/6)"); return True
     return False
 
 # ============================================================================
-# KEYBOARDS
-# ============================================================================
-
-def start_keyboard():
-    return ReplyKeyboardMarkup([
-        [KeyboardButton("✨ Manifest Reality", web_app=WebAppInfo(url=WEBAPP_URL))],
-        [KeyboardButton("⚜️ Help & Lore")]
-    ], resize_keyboard=True)
-
-def utility_keyboard():
-    return ReplyKeyboardMarkup([
-        [KeyboardButton("🌙 Ongoing Character"), KeyboardButton("🌑 End Session")],
-        [KeyboardButton("✨ Manifest New"), KeyboardButton("⚜️ Help")]
-    ], resize_keyboard=True)
-
-# ============================================================================
-# FLASK (Keep-Alive)
+# FLASK KEEP-ALIVE
 # ============================================================================
 
 @app.route('/')
 def home():
-    return "🌙 HERMAX Roleplay Engine - Online"
+    return "🌙 HERMAX Roleplay Engine — Online"
 
 def run_flask():
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
 
 # ============================================================================
-# /start COMMAND
+# /start
 # ============================================================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "✧ 🌙 **HERMAX ROLEPLAY** 🌑 ✧\n\n"
-        "✨ Welcome, Traveler. The boundaries of reality are thinning. "
-        "Tap the button below to design your persona and begin your journey. ⚜️",
+        "🌙 *HERMAX* 🌑\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "✨ _The veil between worlds grows thin._\n\n"
+        "A realm of whispers, desire, and mystery awaits you. "
+        "Choose your companion. Set the scene. "
+        "Let the story write itself.\n\n"
+        "💫 _Tap below to begin your journey..._",
         reply_markup=start_keyboard(),
         parse_mode="Markdown"
     )
 
 # ============================================================================
-# WEB APP HANDLER
+# WEB APP HANDLER — MANIFEST
 # ============================================================================
 
 async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Preloaded characters → prompt from characters.json
-    Custom characters → generic prompt with ai_desc from web app
-    """
     try:
         data = json.loads(update.effective_message.web_app_data.data)
         user_id = update.effective_user.id
@@ -218,30 +244,28 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_preloaded = char_data is not None
 
         reference_image = char_data["image"] if is_preloaded else char_image
-        char_video = char_data.get("video", "") if is_preloaded else ""
+        char_video      = char_data.get("video", "") if is_preloaded else ""
 
-        logging.info(f"🎭 {char_name} | {user_name} | Preloaded: {is_preloaded}")
+        logging.info(f"🎭 {char_name} | {user_name} | preloaded={is_preloaded}")
 
-        # Build system prompt
+        # ── Build system prompt ──────────────────────────────────────
         if is_preloaded:
-            # Preloaded: just fill placeholders from JSON prompt
             system_prompt = char_data['prompt'].format(
                 user_name=user_name,
                 user_gender=user_gender,
                 scenario=scenario
             )
         else:
-            # Custom: generic prompt with placeholders inline
             system_prompt = (
                 "You are {char_name}.\n"
                 "Personality and appearance: {char_desc}\n"
                 "You are talking with {user_name} ({user_gender}).\n\n"
-                "Write exactly like a real human texting — natural, casual, never robotic.\n"
+                "Write exactly like a real human — natural, casual, never robotic.\n"
                 "Match the user's energy and reply length.\n"
                 "Actions go inline with *asterisks*.\n"
                 "Never write for the user. Never break character.\n"
                 "Always end with a small hook — a question, an action, a look.\n"
-                "Start warm and friendly. Only escalate if user clearly leads.\n\n"
+                "Only escalate if user clearly leads.\n\n"
                 "Scenario: {scenario}"
             ).format(
                 char_name=char_name,
@@ -252,37 +276,37 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         user_sessions[user_id] = {
-            "history": [{"role": "system", "content": system_prompt}],
-            "char_name": char_name,
-            "char_desc": char_data.get("desc", "") if is_preloaded else char_desc,
-            "scenario": scenario,
-            "reference_image": reference_image,
-            "is_preloaded": is_preloaded,
-            "message_count": 0,
+            "history":          [{"role": "system", "content": system_prompt}],
+            "char_name":        char_name,
+            "char_desc":        char_data.get("desc", "") if is_preloaded else char_desc,
+            "scenario":         scenario,
+            "reference_image":  reference_image,
+            "is_preloaded":     is_preloaded,
+            "message_count":    0,
             "images_generated": 0,
             "last_20_messages": 0
         }
 
         session = user_sessions[user_id]
 
-        # Intro video (preloaded only)
+        # ── Step 1: Intro video ──────────────────────────────────────
         if char_video:
             try:
                 await update.message.reply_animation(
                     animation=char_video,
-                    caption=f"✨ {char_name} materializes before you...",
+                    caption=f"✨ *{char_name}* stirs from the shadows...",
                     parse_mode="Markdown"
                 )
             except Exception as e:
                 logging.error(f"❌ Video error: {e}")
 
-        # First AI reply
+        # ── Step 2: First AI reply ───────────────────────────────────
         session["history"].append({
             "role": "user",
             "content": f"[SCENARIO]: {scenario}\n\nBegin the roleplay as {char_name}. Set the scene and make your first move."
         })
 
-        response = client.chat.completions.create(
+        response = client_rp.chat.completions.create(
             model=MODEL,
             messages=session["history"],
             temperature=0.85,
@@ -292,17 +316,26 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ai_reply = response.choices[0].message.content
         session["history"].append({"role": "assistant", "content": ai_reply})
 
-        # Opening image
+        # ── Step 3: Cinematic reveal card ────────────────────────────
+        char_desc_short = char_data.get("desc", "") if is_preloaded else char_desc
+        reveal_text = (
+            f"🌑 *A presence awakens...*\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"✦ *{char_name}*\n"
+            f"_{char_desc_short}_\n\n"
+            f"📖 *Scene:*\n_{scenario}_\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"💫 _The story begins..._"
+        )
+
+        # ── Step 4: Send reveal photo + card ────────────────────────
         if is_preloaded:
-            # Preloaded → reference image directly, no API call
             await update.message.reply_photo(
                 photo=reference_image,
-                caption=ai_reply,
-                reply_markup=utility_keyboard(),
+                caption=reveal_text,
                 parse_mode="Markdown"
             )
         else:
-            # Custom → generate AI image
             opening_image, opening_url = generate_scene_image(
                 scene_keywords=f"{scenario}, cinematic, atmospheric",
                 char_name=char_name,
@@ -314,64 +347,80 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if opening_image:
                 await update.message.reply_photo(
                     photo=opening_image,
-                    caption=ai_reply,
-                    reply_markup=utility_keyboard(),
+                    caption=reveal_text,
                     parse_mode="Markdown"
                 )
             else:
-                await update.message.reply_text(
-                    ai_reply,
-                    reply_markup=utility_keyboard(),
-                    parse_mode="Markdown"
-                )
+                await update.message.reply_text(reveal_text, parse_mode="Markdown")
 
-        session["message_count"] = 1
+        # ── Step 5: AI opening reply with keyboard ───────────────────
+        await update.message.reply_text(
+            ai_reply,
+            reply_markup=utility_keyboard(),
+            parse_mode="Markdown"
+        )
+
+        session["message_count"]    = 1
         session["images_generated"] = 1
 
     except Exception as e:
         logging.error(f"❌ Manifest error: {e}")
-        await update.message.reply_text(f"⚠️ Manifestation failed: {e}")
+        await update.message.reply_text(
+            "🌑 _The gateway flickered... something went wrong._\n"
+            "Please try again or tap *Begin Your Story*.",
+            parse_mode="Markdown",
+            reply_markup=start_keyboard()
+        )
 
 # ============================================================================
-# CORE REPLY GENERATOR
+# CORE REPLY GENERATOR — PARALLEL GROK CALLS WHEN IMAGE TRIGGERS
 # ============================================================================
 
 async def generate_reply(update, user_id, input_text):
     session = user_sessions[user_id]
-    wrapped_input = f"-{input_text}\n+reply 60-80 words"
-    session["history"].append({"role": "user", "content": wrapped_input})
+    wrapped = f"-{input_text}\n+reply 60-80 words"
+    session["history"].append({"role": "user", "content": wrapped})
 
     try:
-        # Trimmed history — system prompt + last 10 messages
         system_msg = session["history"][0]
-        recent = session["history"][1:][-10:]
-        trimmed = [system_msg] + recent
+        recent     = session["history"][1:][-10:]
+        trimmed    = [system_msg] + recent
 
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=trimmed,
-            temperature=0.85,
-            max_tokens=95
-        )
+        fire_image = should_generate_image(session)
 
-        ai_reply = response.choices[0].message.content
-        session["history"].append({"role": "assistant", "content": ai_reply})
+        if fire_image:
+            # ── PARALLEL: both Groks fire simultaneously ─────────────
+            logging.info("⚡ Parallel: RP reply + keywords firing together")
 
-        # Update counters
-        session["message_count"] += 1
-        session["last_20_messages"] += 1
+            async def get_rp_reply():
+                resp = client_rp.chat.completions.create(
+                    model=MODEL,
+                    messages=trimmed,
+                    temperature=0.85,
+                    max_tokens=95
+                )
+                return resp.choices[0].message.content
 
-        if session["last_20_messages"] >= 20:
-            session["images_generated"] = 0
-            session["last_20_messages"] = 0
-            logging.info("🔄 Image counter reset")
+            async def get_keywords():
+                return await get_scene_keywords(recent, session["char_name"])
 
-        # Image — only when triggered, keywords from AI reply not user message
-        send_image = False
-        image_bytes = None
+            ai_reply, keywords = await asyncio.gather(
+                get_rp_reply(),
+                get_keywords()
+            )
 
-        if should_generate_image(session):
-            keywords = await get_scene_keywords(ai_reply, session["char_name"])
+            # Update session
+            session["history"].append({"role": "assistant", "content": ai_reply})
+            session["message_count"]    += 1
+            session["last_20_messages"] += 1
+
+            if session["last_20_messages"] >= 20:
+                session["images_generated"] = 0
+                session["last_20_messages"] = 0
+                logging.info("🔄 Image counter reset")
+
+            # Generate image from keywords
+            image_bytes = None
             if keywords:
                 image_bytes, _ = generate_scene_image(
                     scene_keywords=keywords,
@@ -379,23 +428,45 @@ async def generate_reply(update, user_id, input_text):
                     reference_image_url=session.get("reference_image")
                 )
                 if image_bytes:
-                    send_image = True
                     session["images_generated"] += 1
-                    logging.info(f"✅ Image ready ({session['images_generated']}/6)")
+                    logging.info(f"✅ Image sent ({session['images_generated']}/6)")
 
-        # Send exactly one response
-        if send_image and image_bytes:
-            await update.message.reply_photo(
-                photo=image_bytes,
-                caption=ai_reply,
-                parse_mode="Markdown"
-            )
+            # Send response
+            if image_bytes:
+                await update.message.reply_photo(
+                    photo=image_bytes,
+                    caption=ai_reply,
+                    parse_mode="Markdown"
+                )
+            else:
+                await update.message.reply_text(ai_reply, parse_mode="Markdown")
+
         else:
+            # ── SEQUENTIAL: RP only, no image ────────────────────────
+            response = client_rp.chat.completions.create(
+                model=MODEL,
+                messages=trimmed,
+                temperature=0.85,
+                max_tokens=95
+            )
+            ai_reply = response.choices[0].message.content
+            session["history"].append({"role": "assistant", "content": ai_reply})
+            session["message_count"]    += 1
+            session["last_20_messages"] += 1
+
+            if session["last_20_messages"] >= 20:
+                session["images_generated"] = 0
+                session["last_20_messages"] = 0
+                logging.info("🔄 Image counter reset")
+
             await update.message.reply_text(ai_reply, parse_mode="Markdown")
 
     except Exception as e:
         logging.error(f"❌ Reply error: {e}")
-        await update.message.reply_text(f"🌑 The void is silent... (Error: {e})")
+        await update.message.reply_text(
+            "🌑 _The void stirs but stays silent..._\n_Try again in a moment._",
+            parse_mode="Markdown"
+        )
 
 # ============================================================================
 # MESSAGE ROUTER
@@ -403,52 +474,103 @@ async def generate_reply(update, user_id, input_text):
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    text = update.message.text
+    text    = update.message.text
 
-    if text == "🌑 End Session":
+    # ── End Dream ────────────────────────────────────────────────────
+    if text == "🌙 End Dream":
         if user_id in user_sessions:
             char_name = user_sessions[user_id]['char_name']
+            count     = user_sessions[user_id]['message_count']
             del user_sessions[user_id]
             await update.message.reply_text(
-                f"✨ The vision of {char_name} fades into the void. Session ended. 🌑",
-                reply_markup=start_keyboard()
-            )
-        else:
-            await update.message.reply_text("🌙 No active session.", reply_markup=start_keyboard())
-        return
-
-    elif text == "🌙 Ongoing Character":
-        if user_id in user_sessions:
-            s = user_sessions[user_id]
-            await update.message.reply_text(
-                f"⚜️ **Current Manifestation:** {s['char_name']}\n\n"
-                f"**Essence:** {s['char_desc']}\n\n"
-                f"**Messages exchanged:** {s['message_count']}",
+                f"🌙 *The dream fades...*\n\n"
+                f"Your story with *{char_name}* drifts into memory.\n"
+                f"_{count} moments shared between you._\n\n"
+                f"✨ _Until the next dream begins..._",
+                reply_markup=start_keyboard(),
                 parse_mode="Markdown"
             )
         else:
-            await update.message.reply_text("🌑 No active character. Use /start to manifest one.")
+            await update.message.reply_text(
+                "🌸 _No dream is active right now._\n_Tap below to begin one._",
+                reply_markup=start_keyboard(),
+                parse_mode="Markdown"
+            )
         return
 
-    elif "Help" in text:
+    # ── Current Story ────────────────────────────────────────────────
+    elif text == "💭 Current Story":
+        if user_id in user_sessions:
+            s = user_sessions[user_id]
+            await update.message.reply_text(
+                f"💭 *Your Current Dream*\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"✦ *Character:* {s['char_name']}\n"
+                f"_{s['char_desc']}_\n\n"
+                f"📖 *Scene:* _{s['scenario']}_\n\n"
+                f"💬 *Moments shared:* {s['message_count']}\n"
+                f"━━━━━━━━━━━━━━━━━━",
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text(
+                "🌸 _No dream is active yet._\nTap *Begin Your Story* to start. ✨",
+                reply_markup=start_keyboard(),
+                parse_mode="Markdown"
+            )
+        return
+
+    # ── Who Am I ─────────────────────────────────────────────────────
+    elif text == "🎭 Who Am I?":
         await update.message.reply_text(
-            "🌙 **HERMAX ROLEPLAY HELP** ⚜️\n\n"
-            "✨ **Manifest Reality:** Create your character and scenario\n"
-            "🌑 **End Session:** Clear current roleplay\n"
-            "🌙 **Ongoing Character:** View current character info\n\n"
-            "Just type to interact naturally with your character!",
+            "🎭 *HERMAX Roleplay*\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "✦ _An immersive AI roleplay experience_\n\n"
+            "✨ *Begin Your Story* — Open the character portal\n"
+            "💭 *Current Story* — View your active dream\n"
+            "🌙 *End Dream* — Close the current session\n"
+            "🌸 *New Story* — Start a fresh adventure\n\n"
+            "💫 _Just type naturally to talk with your character._\n"
+            "━━━━━━━━━━━━━━━━━━",
             parse_mode="Markdown"
         )
         return
 
-    elif text == "✨ Manifest New":
-        await update.message.reply_text("✨ Opening the gateway...", reply_markup=start_keyboard())
+    # ── How It Works ─────────────────────────────────────────────────
+    elif text == "🌸 How It Works":
+        await update.message.reply_text(
+            "🌸 *How HERMAX Works*\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "1️⃣ Tap *Begin Your Story*\n"
+            "_Choose your character, set the scene_\n\n"
+            "2️⃣ _The story awakens_\n"
+            "_Your character appears, the dream begins_\n\n"
+            "3️⃣ _Just... talk_\n"
+            "_Type naturally. The character responds._\n\n"
+            "✨ _Images appear as your story deepens._\n"
+            "━━━━━━━━━━━━━━━━━━",
+            parse_mode="Markdown"
+        )
         return
 
+    # ── New Story ────────────────────────────────────────────────────
+    elif text == "🌸 New Story":
+        if user_id in user_sessions:
+            del user_sessions[user_id]
+        await update.message.reply_text(
+            "✨ _Opening the gateway to a new dream..._",
+            reply_markup=start_keyboard(),
+            parse_mode="Markdown"
+        )
+        return
+
+    # ── No active session ────────────────────────────────────────────
     if user_id not in user_sessions:
         await update.message.reply_text(
-            "🌙 Please use /start to manifest a character first!",
-            reply_markup=start_keyboard()
+            "🌙 _No dream is active yet._\n\n"
+            "Tap *Begin Your Story* to choose your character and begin. ✨",
+            reply_markup=start_keyboard(),
+            parse_mode="Markdown"
         )
         return
 
