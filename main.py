@@ -63,7 +63,6 @@ def build_image_prompt(scene_keywords, char_name):
     logging.info(f"🖼️ Image prompt: {prompt}")
     return prompt
 
-
 def generate_scene_image(scene_keywords, char_name, reference_image_url=None):
     try:
         final_prompt = build_image_prompt(scene_keywords, char_name)
@@ -98,7 +97,6 @@ def generate_scene_image(scene_keywords, char_name, reference_image_url=None):
         logging.error(f"❌ Image error: {e}")
         return (None, None)
 
-
 async def get_scene_keywords(ai_reply, char_name):
     """
     Extracts image keywords from Grok's OWN RP reply.
@@ -124,7 +122,7 @@ async def get_scene_keywords(ai_reply, char_name):
                 )
             }],
             temperature=0.5,
-            max_tokens=60
+            max_tokens=30
         )
 
         keywords = response.choices[0].message.content.strip()
@@ -165,7 +163,6 @@ def start_keyboard():
         [KeyboardButton("✨ Manifest Reality", web_app=WebAppInfo(url=WEBAPP_URL))],
         [KeyboardButton("⚜️ Help & Lore")]
     ], resize_keyboard=True)
-
 
 def utility_keyboard():
     return ReplyKeyboardMarkup([
@@ -289,7 +286,8 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model=MODEL,
             messages=session["history"],
             temperature=0.85,
-            max_tokens=90
+            min_tokens=85,
+            max_tokens=95
         )
 
         ai_reply = response.choices[0].message.content
@@ -353,7 +351,8 @@ async def generate_reply(update, user_id, input_text):
             model=MODEL,
             messages=trimmed,
             temperature=0.85,
-            max_tokens=90
+            min_tokens=85,
+            max_tokens=95
         )
 
         ai_reply = response.choices[0].message.content
