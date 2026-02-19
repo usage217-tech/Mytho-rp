@@ -286,7 +286,6 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model=MODEL,
             messages=session["history"],
             temperature=0.85,
-            min_tokens=85,
             max_tokens=95
         )
 
@@ -339,7 +338,8 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def generate_reply(update, user_id, input_text):
     session = user_sessions[user_id]
-    session["history"].append({"role": "user", "content": input_text})
+    wrapped_input = f"-{input_text}\n+reply 60-80 words"
+    session["history"].append({"role": "user", "content": wrapped_input})
 
     try:
         # Trimmed history — system prompt + last 10 messages
@@ -351,7 +351,6 @@ async def generate_reply(update, user_id, input_text):
             model=MODEL,
             messages=trimmed,
             temperature=0.85,
-            min_tokens=85,
             max_tokens=95
         )
 
