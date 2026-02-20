@@ -7,20 +7,19 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
         :root {
-            --bg: #080810;
-            --surface: #0e0e1a;
-            --surface2: #13131f;
-            --border: rgba(255,255,255,0.06);
-            --border-hover: rgba(255,255,255,0.12);
-            --accent: #b87fff;
-            --accent2: #ff7eb3;
-            --accent-glow: rgba(184,127,255,0.2);
-            --text: #ede8f5;
-            --muted: rgba(237,232,245,0.4);
-            --gold: #e8c97a;
+            --bg:      #07070f;
+            --surface: #0d0d1a;
+            --sur2:    #12121f;
+            --border:  rgba(255,255,255,0.06);
+            --bho:     rgba(255,255,255,0.11);
+            --accent:  #b07eff;
+            --pink:    #ff7eb3;
+            --glow:    rgba(176,126,255,0.22);
+            --text:    #ece6f5;
+            --muted:   rgba(236,230,245,0.38);
         }
 
         html, body {
@@ -29,610 +28,696 @@
             color: var(--text);
             min-height: 100vh;
             overflow-x: hidden;
-            padding-bottom: 85px;
+            padding-bottom: 90px;
         }
 
         ::-webkit-scrollbar { width: 0; }
 
-        /* ── NOISE OVERLAY ── */
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-            pointer-events: none;
-            z-index: 0;
-            opacity: 0.4;
+        /* noise */
+        body::after {
+            content:''; position:fixed; inset:0;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+            pointer-events:none; z-index:999;
         }
 
         /* ── HEADER ── */
         .header {
-            padding: 24px 20px 8px;
-            position: relative;
-            z-index: 1;
+            padding: 22px 20px 6px;
         }
-
-        .header-logo {
+        .logo {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 32px;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            background: linear-gradient(135deg, #ede8f5 0%, #b87fff 50%, #ff7eb3 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            line-height: 1;
+            font-size: 30px; font-weight: 700;
+            letter-spacing: 0.1em;
+            background: linear-gradient(130deg, #ece6f5, #b07eff 55%, #ff7eb3);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
-
-        .header-sub {
-            font-size: 10px;
-            font-weight: 500;
-            color: var(--muted);
-            letter-spacing: 0.25em;
-            text-transform: uppercase;
-            margin-top: 3px;
+        .logo-sub {
+            font-size: 10px; font-weight: 500;
+            color: var(--muted); letter-spacing: 0.22em;
+            text-transform: uppercase; margin-top: 2px;
         }
 
         /* ── TABS ── */
-        .tab-content { display: none; animation: fadeIn 0.25s ease; }
-        .tab-content.active { display: block; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(6px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
+        .tab-content { display:none; }
+        .tab-content.active { display:block; animation: fadeIn 0.22s ease; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(7px); } to { opacity:1; transform:none; } }
 
         /* ── SECTION LABEL ── */
-        .section-label {
-            font-size: 10px;
-            font-weight: 600;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-            padding: 0 20px;
-            margin: 22px 0 12px;
+        .slabel {
+            font-size: 10px; font-weight: 600;
+            color: var(--muted); text-transform: uppercase;
+            letter-spacing: 0.2em; padding: 0 20px;
+            margin: 20px 0 11px;
         }
 
-        /* ── STYLE SWITCHER (top pill) ── */
-        .style-switcher {
-            display: flex;
-            margin: 0 20px 4px;
+        /* ── GENDER HERO ── */
+        .gender-row {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 10px; padding: 0 16px;
+        }
+
+        .gender-btn {
             background: var(--surface);
-            border-radius: 14px;
-            padding: 4px;
             border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 22px 16px 18px;
+            cursor: pointer;
+            display: flex; flex-direction: column;
+            align-items: center; gap: 8px;
+            transition: all 0.22s ease;
+            position: relative; overflow: hidden;
         }
+        .gender-btn::before {
+            content:''; position:absolute; inset:0; opacity:0;
+            transition: opacity 0.22s;
+        }
+        #btn-female::before { background: radial-gradient(ellipse at 50% 110%, rgba(176,126,255,0.18), transparent 65%); }
+        #btn-male::before   { background: radial-gradient(ellipse at 50% 110%, rgba(255,126,179,0.18), transparent 65%); }
+        .gender-btn.active::before { opacity: 1; }
+        .gender-btn.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+        #btn-male.active   { border-color: var(--pink);   box-shadow: 0 0 0 1px var(--pink); }
 
-        .style-btn {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 10px;
+        .gender-icon { font-size: 26px; line-height: 1; }
+        .gender-name {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 19px; font-weight: 700; color: var(--text);
+        }
+        .gender-hint { font-size: 11px; color: var(--muted); }
+
+        /* ── STYLE PILLS ── */
+        .style-pills {
+            display: flex; gap: 8px;
+            padding: 0 20px; margin-bottom: 14px;
+        }
+        .style-pill {
+            padding: 7px 20px;
+            border-radius: 50px;
+            border: 1px solid var(--border);
             background: transparent;
             color: var(--muted);
             font-family: 'DM Sans', sans-serif;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            font-size: 13px; font-weight: 500;
+            cursor: pointer; transition: all 0.2s;
         }
-
-        .style-btn.active {
-            background: var(--surface2);
-            color: var(--text);
-            font-weight: 600;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.3);
-        }
-
-        /* ── GENDER SELECTOR ── */
-        .gender-hero {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            padding: 0 20px;
-        }
-
-        .gender-hero-btn {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 20px 16px;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.25s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .gender-hero-btn::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            opacity: 0;
-            transition: opacity 0.25s;
-        }
-
-        .gender-hero-btn:nth-child(1)::before {
-            background: radial-gradient(ellipse at 50% 100%, rgba(184,127,255,0.15) 0%, transparent 70%);
-        }
-
-        .gender-hero-btn:nth-child(2)::before {
-            background: radial-gradient(ellipse at 50% 100%, rgba(255,126,179,0.15) 0%, transparent 70%);
-        }
-
-        .gender-hero-btn.active::before { opacity: 1; }
-
-        .gender-hero-btn.active {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 1px var(--accent), inset 0 0 30px rgba(184,127,255,0.05);
-        }
-
-        .gender-hero-btn:nth-child(2).active {
-            border-color: var(--accent2);
-            box-shadow: 0 0 0 1px var(--accent2), inset 0 0 30px rgba(255,126,179,0.05);
-        }
-
-        .gender-icon {
-            font-size: 28px;
-            line-height: 1;
-        }
-
-        .gender-label {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--text);
-        }
-
-        .gender-sub {
-            font-size: 11px;
-            color: var(--muted);
+        .style-pill.active {
+            background: var(--accent); border-color: var(--accent);
+            color: #fff; font-weight: 600;
+            box-shadow: 0 3px 14px rgba(176,126,255,0.3);
         }
 
         /* ── CHARACTER GRID ── */
         .char-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            padding: 0 16px;
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 10px; padding: 0 16px;
         }
 
         .char-card {
-            position: relative;
-            border-radius: 20px;
-            overflow: hidden;
-            cursor: pointer;
+            position: relative; border-radius: 22px;
+            overflow: hidden; cursor: pointer;
             border: 1px solid var(--border);
             background: var(--surface);
-            transition: transform 0.2s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+            transition: transform 0.18s, border-color 0.22s, box-shadow 0.22s;
             aspect-ratio: 0.72;
-            --glow: rgba(184,127,255,0.25);
+            --cglow: rgba(176,126,255,0.28);
         }
-
         .char-card:active { transform: scale(0.96); }
-
         .char-card.selected {
             border-color: var(--accent);
-            box-shadow: 0 0 0 1px var(--accent), 0 0 40px var(--glow);
+            box-shadow: 0 0 0 1px var(--accent), 0 0 36px var(--cglow);
         }
 
-        .char-card-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-            transition: transform 0.4s ease;
+        .char-img {
+            width:100%; height:100%; object-fit:cover; display:block;
+            transition: transform 0.35s;
         }
+        .char-card:active .char-img { transform: scale(1.04); }
 
-        .char-card:active .char-card-img { transform: scale(1.03); }
-
-        .char-card-overlay {
-            position: absolute;
-            bottom: 0; left: 0; right: 0;
-            padding: 50px 14px 16px;
-            background: linear-gradient(to top, rgba(5,5,12,0.95) 0%, rgba(5,5,12,0.5) 50%, transparent 100%);
+        .char-overlay {
+            position:absolute; bottom:0; left:0; right:0;
+            padding: 48px 13px 15px;
+            background: linear-gradient(to top, rgba(4,4,14,0.96) 0%, rgba(4,4,14,0.45) 55%, transparent);
         }
-
-        .char-card-name {
+        .char-name {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 21px;
-            font-weight: 700;
-            color: #fff;
-            line-height: 1.1;
-            margin-bottom: 3px;
+            font-size: 21px; font-weight: 700; color: #fff;
+            line-height: 1.1; margin-bottom: 3px;
         }
-
-        .char-card-desc {
-            font-size: 11px;
-            color: rgba(255,255,255,0.55);
-            line-height: 1.4;
-        }
+        .char-desc { font-size: 11px; color: rgba(255,255,255,0.52); line-height: 1.4; }
 
         .char-check {
-            position: absolute;
-            top: 10px; right: 10px;
-            width: 26px; height: 26px;
-            border-radius: 50%;
-            border: 1.5px solid rgba(255,255,255,0.25);
-            background: transparent;
-            display: flex; align-items: center; justify-content: center;
-            transition: all 0.2s ease;
-            font-size: 12px;
+            position:absolute; top:10px; right:10px;
+            width:26px; height:26px; border-radius:50%;
+            border: 1.5px solid rgba(255,255,255,0.22);
+            display:flex; align-items:center; justify-content:center;
+            font-size:12px; color:transparent;
+            transition: all 0.18s;
         }
-
         .char-card.selected .char-check {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: white;
+            background: var(--accent); border-color: var(--accent);
+            color: #fff;
         }
 
-        /* ── CUSTOM CARD ── */
-        .custom-card-inner {
-            width: 100%; height: 100%;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            gap: 10px; padding: 20px;
-            background: linear-gradient(145deg, #110a2a, #0a0818);
-            border: 1px dashed rgba(184,127,255,0.25);
-            border-radius: 20px;
+        /* custom card */
+        .custom-inner {
+            width:100%; height:100%;
+            display:flex; flex-direction:column;
+            align-items:center; justify-content:center;
+            gap:11px; padding:20px;
+            background: linear-gradient(145deg,#100926,#09081a);
         }
-
-        .custom-pill {
-            background: rgba(184,127,255,0.12);
-            border: 1px solid rgba(184,127,255,0.2);
-            border-radius: 50px;
-            padding: 6px 14px;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--accent);
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
+        .custom-pill-badge {
+            background: rgba(176,126,255,0.1);
+            border: 1px solid rgba(176,126,255,0.22);
+            border-radius:50px; padding:6px 14px;
+            font-size:10px; font-weight:700;
+            color:var(--accent); letter-spacing:0.12em; text-transform:uppercase;
         }
-
-        .custom-card-title {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--text);
-            text-align: center;
+        .custom-title {
+            font-family:'Cormorant Garamond',serif;
+            font-size:19px; font-weight:700; color:var(--text); text-align:center;
         }
+        .custom-hint { font-size:11px; color:var(--muted); text-align:center; line-height:1.5; }
 
-        .custom-card-sub {
-            font-size: 11px;
-            color: var(--muted);
-            text-align: center;
-            line-height: 1.5;
+        /* ── SCENE CARDS ── */
+        .scene-list {
+            padding: 0 16px; margin-top: 12px;
+            display:none; flex-direction:column; gap:8px;
         }
-
-        /* ── CUSTOM FIELDS ── */
-        .custom-fields {
-            padding: 0 16px;
-            margin-top: 14px;
-            display: none;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .custom-fields.visible { display: flex; }
-
-        /* ── SCENE PICKER (preloaded) ── */
-        .scene-picker {
-            padding: 0 16px;
-            margin-top: 14px;
-            display: none;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .scene-picker.visible { display: flex; }
+        .scene-list.show { display:flex; }
 
         .scene-card {
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 16px;
-            padding: 16px;
+            padding: 15px 16px;
             cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
+            display: flex; align-items: flex-start; gap: 12px;
+            transition: all 0.18s;
         }
-
         .scene-card:active { transform: scale(0.98); }
-
         .scene-card.selected {
             border-color: var(--accent);
-            background: rgba(184,127,255,0.06);
+            background: rgba(176,126,255,0.06);
         }
-
         .scene-dot {
-            width: 8px; height: 8px;
-            border-radius: 50%;
-            background: var(--muted);
-            margin-top: 5px;
-            flex-shrink: 0;
-            transition: background 0.2s;
+            width:7px; height:7px; border-radius:50%;
+            background: var(--muted); margin-top:6px; flex-shrink:0;
+            transition: background 0.18s;
         }
-
         .scene-card.selected .scene-dot { background: var(--accent); }
-
         .scene-text {
             font-family: 'Cormorant Garamond', serif;
-            font-size: 15px;
-            font-style: italic;
-            color: rgba(237,232,245,0.7);
-            line-height: 1.5;
+            font-size:15px; font-style:italic;
+            color:rgba(236,230,245,0.65); line-height:1.5;
+        }
+        .scene-card.selected .scene-text { color:var(--text); }
+
+        /* ── CUSTOM FIELDS ── */
+        .custom-fields {
+            padding:0 16px; margin-top:12px;
+            display:none; flex-direction:column; gap:10px;
+        }
+        .custom-fields.show { display:flex; }
+
+        .field-wrap { display:flex; flex-direction:column; gap:6px; }
+        .flabel {
+            font-size:10px; font-weight:600;
+            color:var(--muted); text-transform:uppercase; letter-spacing:0.18em;
+        }
+        .finput, .ftarea {
+            width:100%; background:var(--surface);
+            border:1px solid var(--border); border-radius:13px;
+            color:var(--text); font-family:'DM Sans',sans-serif;
+            font-size:15px; padding:13px 15px; outline:none;
+            transition:border-color 0.18s; resize:none;
+        }
+        .finput::placeholder, .ftarea::placeholder { color:var(--muted); }
+        .finput:focus, .ftarea:focus { border-color:rgba(176,126,255,0.5); }
+
+        /* ── IDENTITY SECTION ── */
+        .id-section {
+            padding:0 16px; display:flex;
+            flex-direction:column; gap:18px; margin-top:8px;
         }
 
-        .scene-card.selected .scene-text { color: var(--text); }
-
-        /* ── INPUTS ── */
-        .field-wrap { display: flex; flex-direction: column; gap: 6px; }
-
-        .field-label {
-            font-size: 10px;
-            font-weight: 600;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
+        .ugender-row {
+            display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;
+        }
+        .ugender-btn {
+            background:var(--surface); border:1px solid var(--border);
+            border-radius:12px; color:var(--muted);
+            font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500;
+            padding:13px 8px; cursor:pointer; transition:all 0.18s;
+        }
+        .ugender-btn.active {
+            background:rgba(176,126,255,0.1); border-color:var(--accent);
+            color:var(--text); font-weight:600;
         }
 
-        .field-input, .field-textarea {
-            width: 100%;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            color: var(--text);
-            font-family: 'DM Sans', sans-serif;
-            font-size: 15px;
-            padding: 14px 16px;
-            outline: none;
-            transition: border-color 0.2s;
-            resize: none;
+        /* ── SCENARIO SECTION ── */
+        .scen-section {
+            padding:0 16px; display:flex;
+            flex-direction:column; gap:12px; margin-top:8px;
         }
-
-        .field-input::placeholder, .field-textarea::placeholder { color: var(--muted); }
-        .field-input:focus, .field-textarea:focus { border-color: rgba(184,127,255,0.5); }
-
-        /* ── USER GENDER BUTTONS ── */
-        .user-gender-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 8px;
+        .scen-textarea {
+            width:100%; background:var(--surface);
+            border:1px solid var(--border); border-radius:18px;
+            color:var(--text); font-family:'Cormorant Garamond',serif;
+            font-size:16px; padding:17px; outline:none;
+            min-height:130px; resize:none;
+            transition:border-color 0.18s; line-height:1.65;
         }
+        .scen-textarea::placeholder { color:var(--muted); font-style:italic; }
+        .scen-textarea:focus { border-color:rgba(176,126,255,0.5); }
 
-        .user-gender-btn {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            color: var(--muted);
-            font-family: 'DM Sans', sans-serif;
-            font-size: 13px;
-            font-weight: 500;
-            padding: 13px 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .user-gender-btn.active {
-            background: rgba(184,127,255,0.12);
-            border-color: var(--accent);
-            color: var(--text);
-            font-weight: 600;
-        }
-
-        /* ── SCENARIO TEXTAREA ── */
-        .scenario-box {
-            width: 100%;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            color: var(--text);
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 16px;
-            padding: 18px;
-            outline: none;
-            min-height: 130px;
-            resize: none;
-            transition: border-color 0.2s;
-            line-height: 1.65;
-        }
-
-        .scenario-box::placeholder { color: var(--muted); font-style: italic; }
-        .scenario-box:focus { border-color: rgba(184,127,255,0.5); }
-
-        /* ── MANIFEST BUTTON ── */
+        /* ── BUTTONS ── */
         .manifest-btn {
-            width: calc(100% - 32px);
-            margin: 20px 16px 12px;
-            padding: 18px;
-            background: linear-gradient(135deg, #7c3aed, #b87fff, #ff7eb3);
-            border: none;
-            border-radius: 18px;
-            color: white;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 15px;
-            font-weight: 600;
-            letter-spacing: 0.04em;
-            cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-            box-shadow: 0 8px 32px rgba(184,127,255,0.3), 0 0 0 1px rgba(255,255,255,0.05) inset;
-            transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s;
-            position: relative;
-            overflow: hidden;
+            width:calc(100% - 32px); margin:18px 16px 10px;
+            padding:18px; border:none; border-radius:18px;
+            background:linear-gradient(135deg,#6d28d9,#b07eff,#ff7eb3);
+            color:#fff; font-family:'DM Sans',sans-serif;
+            font-size:15px; font-weight:600; letter-spacing:0.04em;
+            cursor:pointer; display:flex; align-items:center;
+            justify-content:center; gap:9px;
+            box-shadow:0 8px 28px rgba(176,126,255,0.28), inset 0 0 0 1px rgba(255,255,255,0.07);
+            transition:transform 0.14s, box-shadow 0.14s; position:relative; overflow:hidden;
         }
-
         .manifest-btn::before {
-            content: '';
-            position: absolute;
-            top: 0; left: -100%;
-            width: 100%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-            transition: left 0.5s ease;
+            content:''; position:absolute;
+            top:0; left:-100%; width:100%; height:100%;
+            background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
+            transition:left 0.45s;
         }
-
-        .manifest-btn:active::before { left: 100%; }
-        .manifest-btn:active { transform: scale(0.97); box-shadow: 0 4px 16px rgba(184,127,255,0.2); }
+        .manifest-btn:active::before { left:100%; }
+        .manifest-btn:active { transform:scale(0.97); box-shadow:0 4px 14px rgba(176,126,255,0.2); }
 
         .next-btn {
-            width: 100%;
-            padding: 16px;
-            background: var(--surface2);
-            border: 1px solid var(--border-hover);
-            border-radius: 16px;
-            color: var(--text);
-            font-family: 'DM Sans', sans-serif;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            transition: all 0.2s ease;
+            width:100%; padding:15px; border-radius:16px;
+            background:var(--sur2); border:1px solid var(--bho);
+            color:var(--text); font-family:'DM Sans',sans-serif;
+            font-size:14px; font-weight:500; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; gap:7px;
+            transition:all 0.18s;
         }
-
-        .next-btn:active { transform: scale(0.98); }
+        .next-btn:active { transform:scale(0.98); }
 
         /* ── BOTTOM NAV ── */
         .bottom-nav {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            height: 72px;
-            background: rgba(8,8,16,0.92);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-            border-top: 1px solid var(--border);
-            display: flex; align-items: center; justify-content: space-around;
-            padding: 0 12px;
-            z-index: 100;
+            position:fixed; bottom:0; left:0; right:0; height:72px;
+            background:rgba(7,7,15,0.93);
+            backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
+            border-top:1px solid var(--border);
+            display:flex; align-items:center; justify-content:space-around;
+            padding:0 10px; z-index:100;
         }
-
         .nav-btn {
-            display: flex; flex-direction: column;
-            align-items: center; gap: 4px;
-            cursor: pointer;
-            padding: 8px 24px;
-            border-radius: 14px;
-            border: none;
-            background: transparent;
-            transition: all 0.2s ease;
+            display:flex; flex-direction:column; align-items:center; gap:4px;
+            cursor:pointer; padding:8px 24px; border-radius:14px;
+            border:none; background:transparent; transition:all 0.18s;
         }
-
-        .nav-icon {
-            width: 22px; height: 22px;
-            stroke: var(--muted);
-            fill: none;
-            stroke-width: 1.8;
-            transition: stroke 0.2s;
+        .nav-ico {
+            width:22px; height:22px; stroke:var(--muted);
+            fill:none; stroke-width:1.8; transition:stroke 0.18s;
         }
-
-        .nav-label {
-            font-size: 10px;
-            font-weight: 500;
-            color: var(--muted);
-            letter-spacing: 0.05em;
-            transition: color 0.2s;
+        .nav-lbl {
+            font-size:10px; font-weight:500; color:var(--muted);
+            letter-spacing:0.05em; transition:color 0.18s;
         }
+        .nav-btn.active .nav-ico { stroke:var(--accent); }
+        .nav-btn.active .nav-lbl { color:var(--accent); }
 
-        .nav-btn.active .nav-icon { stroke: var(--accent); }
-        .nav-btn.active .nav-label { color: var(--accent); }
-
-        /* ── DIVIDER ── */
-        .divider {
-            height: 1px;
-            background: var(--border);
-            margin: 20px 16px;
-        }
-
-        /* ── IDENTITY / SCENARIO SECTIONS ── */
-        .page-section {
-            padding: 0 16px;
-            display: flex; flex-direction: column; gap: 18px;
-            margin-top: 8px;
-        }
-
-        /* ── FADE UP ANIM ── */
+        /* ── FADE UP ── */
         @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to   { opacity: 1; transform: translateY(0); }
+            from { opacity:0; transform:translateY(10px); }
+            to   { opacity:1; transform:none; }
         }
-
-        .fade-up {
-            animation: fadeUp 0.3s ease both;
-        }
-
-        .fade-up:nth-child(1) { animation-delay: 0.00s; }
-        .fade-up:nth-child(2) { animation-delay: 0.05s; }
-        .fade-up:nth-child(3) { animation-delay: 0.10s; }
-        .fade-up:nth-child(4) { animation-delay: 0.15s; }
-        .fade-up:nth-child(5) { animation-delay: 0.20s; }
-        .fade-up:nth-child(6) { animation-delay: 0.25s; }
-
-        /* ── STYLE TABS (inline) ── */
-        .style-tabs-inline {
-            display: flex;
-            gap: 8px;
-            padding: 0 20px;
-            margin-bottom: 14px;
-        }
-
-        .style-tab-pill {
-            padding: 7px 18px;
-            border-radius: 50px;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--muted);
-            font-family: 'DM Sans', sans-serif;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .style-tab-pill.active {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: white;
-            font-weight: 600;
-            box-shadow: 0 4px 16px rgba(184,127,255,0.3);
-        }
+        .fu { animation:fadeUp 0.28s ease both; }
+        .fu:nth-child(1){animation-delay:0s}
+        .fu:nth-child(2){animation-delay:.05s}
+        .fu:nth-child(3){animation-delay:.10s}
+        .fu:nth-child(4){animation-delay:.15s}
+        .fu:nth-child(5){animation-delay:.20s}
+        .fu:nth-child(6){animation-delay:.25s}
     </style>
 </head>
 <body>
 
-<!-- ===================== PERSONA TAB ===================== -->
+<!-- ══════════════ PERSONA TAB ══════════════ -->
 <div id="tab-chars" class="tab-content active">
     <div class="header">
-        <div class="header-logo">HERMAX</div>
-        <div class="header-sub">Royal Noir · Roleplay</div>
+        <div class="logo">HERMAX</div>
+        <div class="logo-sub">Royal Noir · Roleplay</div>
     </div>
 
-    <p class="section-label">Choose a companion</p>
-    <div class="gender-hero">
-        <button class="gender-hero-btn" id="btn-female" onclick="setAiGender('Female')">
+    <p class="slabel">Choose a companion</p>
+    <div class="gender-row">
+        <button class="gender-btn" id="btn-female" onclick="setGender('Female')">
             <div class="gender-icon">♀</div>
-            <div class="gender-label">The Queen</div>
-            <div class="gender-sub">Female characters</div>
+            <div class="gender-name">The Queen</div>
+            <div class="gender-hint">Female characters</div>
         </button>
-        <button class="gender-hero-btn" id="btn-male" onclick="setAiGender('Male')">
+        <button class="gender-btn" id="btn-male" onclick="setGender('Male')">
             <div class="gender-icon">♂</div>
-            <div class="gender-label">The King</div>
-            <div class="gender-sub">Male characters</div>
+            <div class="gender-name">The King</div>
+            <div class="gender-hint">Male characters</div>
         </button>
     </div>
 
-    <div id="style-section" style="display:none;">
-        <p class="section-label">Style</p>
-        <div class="style-tabs-inline">
-            <button class="style-tab-pill active" id="btn-realistic" onclick="setStyle('Realistic')">Realistic</button>
-            <button class="style-tab-pill" id="btn-anime" onclick="setStyle('Anime')">Anime</button>
+    <!-- Style pills -->
+    <div id="style-section" style="display:none">
+        <p class="slabel">Style</p>
+        <div class="style-pills">
+            <button class="style-pill active" id="pill-realistic" onclick="setStyle('Realistic')">Realistic</button>
+            <button class="style-pill" id="pill-anime" onclick="setStyle('Anime')">Anime</button>
         </div>
     </div>
 
-    <div id="char-section" style="display:none;">
-        <p class="section-label" id="char-section-label">Select a persona</p>
+    <!-- Character grid -->
+    <div id="char-section" style="display:none">
+        <p class="slabel">Select a persona</p>
         <div class="char-grid" id="char-grid"></div>
 
-        <!-- Custom fields (custom char only) -->
+        <!-- Scene cards (preloaded chars) -->
+        <div class="scene-list" id="scene-list"></div>
+
+        <!-- Custom fields (custom char) -->
         <div class="custom-fields" id="custom-fields">
-  
+            <div class="field-wrap">
+                <div class="flabel">Character Name</div>
+                <input type="text" id="c-name" placeholder="Name the entity..." class="finput"/>
+            </div>
+            <div class="field-wrap">
+                <div class="flabel">Appearance & Personality</div>
+                <textarea id="c-desc" placeholder="Describe them..." class="ftarea" rows="3"></textarea>
+            </div>
+            <div class="field-wrap">
+                <div class="flabel">Image URL (optional)</div>
+                <input type="text" id="c-image" placeholder="https://..." class="finput"/>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════ IDENTITY TAB ══════════════ -->
+<div id="tab-identity" class="tab-content">
+    <div class="header">
+        <div class="logo">Identity</div>
+        <div class="logo-sub">Define your presence</div>
+    </div>
+
+    <div class="id-section">
+        <div class="field-wrap">
+            <div class="flabel">Your Name</div>
+            <input type="text" id="user-name" placeholder="Enter your name..." class="finput"/>
+        </div>
+
+        <div class="field-wrap">
+            <div class="flabel">Your Gender</div>
+            <div class="ugender-row">
+                <button class="ugender-btn active" id="ug-m" onclick="setUserGender('Male')">Male</button>
+                <button class="ugender-btn" id="ug-f" onclick="setUserGender('Female')">Female</button>
+                <button class="ugender-btn" id="ug-o" onclick="setUserGender('Other')">Other</button>
+            </div>
+        </div>
+
+        <button class="next-btn" onclick="goToScenario()">
+            Next: The Setting
+            <svg style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+    </div>
+</div>
+
+<!-- ══════════════ SCENARIO TAB ══════════════ -->
+<div id="tab-scenario" class="tab-content">
+    <div class="header">
+        <div class="logo">The Setting</div>
+        <div class="logo-sub">Where the story begins</div>
+    </div>
+
+    <div class="scen-section">
+        <textarea id="scenario-input" class="scen-textarea"
+            placeholder="How does the story begin?..."></textarea>
+    </div>
+
+    <button class="manifest-btn" onclick="manifest()">✦ Manifest Reality</button>
+</div>
+
+<!-- ══════════════ BOTTOM NAV ══════════════ -->
+<nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-chars" onclick="switchTab('chars')">
+        <svg class="nav-ico" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        <span class="nav-lbl">Persona</span>
+    </button>
+    <button class="nav-btn" id="nav-identity" onclick="switchTab('identity')">
+        <svg class="nav-ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+        <span class="nav-lbl">Identity</span>
+    </button>
+    <button class="nav-btn" id="nav-scenario" onclick="switchTab('scenario')">
+        <svg class="nav-ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        <span class="nav-lbl">Setting</span>
+    </button>
+</nav>
+
+<script>
+    // ── TELEGRAM ──
+    const tg = window.Telegram.WebApp;
+    tg.ready(); tg.expand();
+
+    const JSON_URL = "https://usage217-tech.github.io/Mytho-rp/characters.json";
+
+    // ── DATA STORE ──
+    // CHARS[style][gender] = [ {name, desc, image, scenes, isCustom?} ]
+    let CHARS = { Realistic:{Female:[],Male:[]}, Anime:{Female:[],Male:[]} };
+
+    // ── SELECTION STATE ──
+    let sel = {
+        charName: '', charDesc: '', charImage: '',
+        userGender: 'Male', style: 'Realistic',
+        scenario: '',       // final scenario sent to bot (scene text for preloaded, custom text for custom)
+        isCustom: false
+    };
+    let currentGender = '';
+    let currentScenes = [];   // array of scene strings for selected char
+
+    // ── LOAD JSON ──
+    async function loadCharacters() {
+        try {
+            const res  = await fetch(JSON_URL);
+            const data = await res.json();
+
+            CHARS = { Realistic:{Female:[],Male:[]}, Anime:{Female:[],Male:[]} };
+
+            Object.entries(data).forEach(([name, c]) => {
+                const s = c.style  || 'Realistic';
+                const g = c.gender || 'Female';
+                if (!CHARS[s])    CHARS[s]    = {};
+                if (!CHARS[s][g]) CHARS[s][g] = [];
+                CHARS[s][g].push({
+                    name:   name,
+                    desc:   c.desc   || '',
+                    image:  c.image  || '',
+                    scenes: c.scenes || []
+                });
+            });
+
+            // Append custom card to each bucket
+            ['Realistic','Anime'].forEach(s =>
+                ['Female','Male'].forEach(g => {
+                    if (CHARS[s] && CHARS[s][g])
+                        CHARS[s][g].push({ name:'custom', desc:'Build any persona you imagine.', image:'', scenes:[], isCustom:true });
+                })
+            );
+
+            console.log('✅ Characters loaded');
+        } catch(e) { console.error('❌ Load failed:', e); }
+    }
+
+    // ── TAB ──
+    function switchTab(id) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + id).classList.add('active');
+        document.getElementById('nav-' + id).classList.add('active');
+        window.scrollTo(0, 0);
+    }
+
+    // ── AI GENDER ──
+    function setGender(g) {
+        currentGender = g;
+        document.getElementById('btn-female').classList.toggle('active', g === 'Female');
+        document.getElementById('btn-male').classList.toggle('active', g === 'Male');
+        document.getElementById('style-section').style.display = 'block';
+        renderGrid(g, sel.style);
+        document.getElementById('char-section').style.display = 'block';
+    }
+
+    // ── STYLE ──
+    function setStyle(s) {
+        sel.style = s;
+        document.getElementById('pill-realistic').classList.toggle('active', s === 'Realistic');
+        document.getElementById('pill-anime').classList.toggle('active', s === 'Anime');
+        renderGrid(currentGender, s);
+    }
+
+    // ── RENDER GRID ──
+    function renderGrid(gender, style) {
+        const grid = document.getElementById('char-grid');
+        grid.innerHTML = '';
+        resetSelectionUI();
+
+        const list = (CHARS[style] && CHARS[style][gender]) ? CHARS[style][gender] : [];
+
+        list.forEach(c => {
+            const card = document.createElement('div');
+            card.className = 'char-card fu';
+
+            if (c.isCustom) {
+                card.innerHTML = `
+                    <div class="custom-inner">
+                        <div class="custom-pill-badge">CUSTOM</div>
+                        <div class="custom-title">Your Character</div>
+                        <div class="custom-hint">Build any persona you imagine</div>
+                    </div>
+                    <div class="char-check">✓</div>`;
+            } else {
+                card.innerHTML = `
+                    <img src="${c.image}" class="char-img" loading="lazy" crossorigin="anonymous"/>
+                    <div class="char-overlay">
+                        <div class="char-name">${c.name}</div>
+                        <div class="char-desc">${c.desc}</div>
+                    </div>
+                    <div class="char-check">✓</div>`;
+
+                // dominant color glow
+                const img = card.querySelector('.char-img');
+                const applyGlow = () => getDominantColor(img, col => card.style.setProperty('--cglow', col));
+                img.onload = applyGlow;
+                if (img.complete) applyGlow();
+            }
+
+            card.onclick = () => selectChar(c, card);
+            grid.appendChild(card);
+        });
+    }
+
+    // ── SELECT CHAR ──
+    function selectChar(c, cardEl) {
+        document.querySelectorAll('.char-card').forEach(x => x.classList.remove('selected'));
+        cardEl.classList.add('selected');
+        resetSelectionUI();
+
+        if (c.isCustom) {
+            sel.charName = ''; sel.charDesc = ''; sel.charImage = '';
+            sel.scenario = ''; sel.isCustom = true;
+            currentScenes = [];
+            document.getElementById('custom-fields').classList.add('show');
+        } else {
+            sel.charName  = c.name;
+            sel.charDesc  = c.desc;
+            sel.charImage = c.image;
+            sel.scenario  = '';
+            sel.isCustom  = false;
+            currentScenes = c.scenes || [];
+
+            if (currentScenes.length > 0) {
+                buildSceneList(currentScenes);
+                document.getElementById('scene-list').classList.add('show');
+            } else {
+                // no scenes defined, go straight to identity
+                setTimeout(() => switchTab('identity'), 280);
+            }
+        }
+    }
+
+    function resetSelectionUI() {
+        document.getElementById('custom-fields').classList.remove('show');
+        document.getElementById('scene-list').classList.remove('show');
+        document.getElementById('scene-list').innerHTML = '';
+        sel.scenario = '';
+    }
+
+    // ── BUILD SCENE LIST ──
+    function buildSceneList(scenes) {
+        const list = document.getElementById('scene-list');
+        list.innerHTML = '';
+
+        scenes.forEach(sceneText => {
+            const card = document.createElement('div');
+            card.className = 'scene-card fu';
+            card.innerHTML = `<div class="scene-dot"></div><div class="scene-text">${sceneText}</div>`;
+
+            card.onclick = () => {
+                document.querySelectorAll('.scene-card').forEach(b => b.classList.remove('selected'));
+                card.classList.add('selected');
+                sel.scenario = sceneText;   // scene string IS the scenario
+                setTimeout(() => switchTab('identity'), 280);
+            };
+
+            list.appendChild(card);
+        });
+    }
+
+    // ── USER GENDER ──
+    function setUserGender(g) {
+        sel.userGender = g;
+        document.querySelectorAll('.ugender-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('ug-' + g[0].toLowerCase()).classList.add('active');
+    }
+
+    // ── GO TO SCENARIO (from identity Next button) ──
+    function goToScenario() {
+        // Preloaded chars skip scenario tab — already picked scene
+        if (!sel.isCustom && sel.scenario) {
+            manifest();
+            return;
+        }
+        switchTab('scenario');
+    }
+
+    // ── DOMINANT COLOR ──
+    function getDominantColor(img, cb) {
+        try {
+            const c = document.createElement('canvas');
+            const x = c.getContext('2d');
+            c.width = img.naturalWidth || img.width;
+            c.height = img.naturalHeight || img.height;
+            x.drawImage(img, 0, 0, c.width, c.height);
+            const d = x.getImageData(c.width*.3, c.height*.3, c.width*.4, c.height*.4).data;
+            let r=0,g=0,b=0,n=0;
+            for(let i=0;i<d.length;i+=20){r+=d[i];g+=d[i+1];b+=d[i+2];n++;}
+            cb(`rgba(${Math.floor(r/n)},${Math.floor(g/n)},${Math.floor(b/n)},0.32)`);
+        } catch(e) { cb('rgba(176,126,255,0.25)'); }
+    }
+
+    // ── MANIFEST ──
+    function manifest() {
+        const userName = document.getElementById('user-name').value.trim();
+
+        const aiName  = sel.isCustom ? document.getElementById('c-name').value.trim()  : sel.charName;
+        const aiDesc  = sel.isCustom ? document.getElementById('c-desc').value.trim()  : sel.charDesc;
+        const aiImage = sel.isCustom ? document.getElementById('c-image').value.trim() : sel.charImage;
+        const scenario = sel.isCustom ? document.getElementById('scenario-input').value.trim() : sel.scenario;
+
+        if (!aiName)   { tg.showAlert('Choose or create a character first.'); switchTab('chars'); return; }
+        if (!userName) { tg.showAlert('Enter your name first.');              switchTab('identity'); return; }
+        if (!scenario) { tg.showAlert('Choose a scene or write a scenario.'); return; }
+
+        tg.sendData(JSON.stringify({
+            ai_name:     aiName,
+            ai_desc:     aiDesc,
+            ai_image:    aiImage,
+            user_name:   userName,
+            user_gender: sel.userGender,
+            scenario:    scenario,
+            is_custom:   sel.isCustom
+        }));
+    }
+
+    // ── INIT ──
+    window.onload = async () => {
+        setUserGender('Male');
+        await loadCharacters();
+    };
+</script>
+</body>
+</html>
