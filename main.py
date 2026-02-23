@@ -84,6 +84,67 @@ def utility_keyboard():
     ], resize_keyboard=True)
 
 # ============================================================================
+# SAFE REPLY SENDER — fixes broken markdown before sending
+# ============================================================================
+
+import re
+
+def fix_markdown(text):
+    """
+    Fix broken markdown — keeps valid pairs like *bold* and _italic_,
+    escapes any unpaired/orphan symbols so Telegram doesn't reject.
+    """
+    # Fix unpaired * (bold)
+    parts = text.split('*')
+    if len(parts) % 2 == 0:
+        # Odd number of * means unpaired — escape them all, let content show clean
+        text = text.replace('*', '\\*')
+    
+    # Fix unpaired _ (italic)
+    parts = text.split('_')
+    if len(parts) % 2 == 0:
+        text = text.replace('_', '\\_')
+    
+    # Fix unpaired ` (code)
+    parts = text.split('`')
+    if len(parts) % 2 == 0:
+        text = text.replace('`', '\\`')
+
+    return text.strip()
+
+async def safe_send(update, text, reply_markup=None, photo=None):
+    """Try sending with markdown, fallback to fixed markdown, then plain."""
+    kwargs = {"reply_markup": reply_markup} if reply_markup else {}
+    
+    # First attempt — original text with Markdown
+    try:
+        if photo:
+            await update.message.reply_photo(photo=photo, caption=text, parse_mode="Markdown", **kwargs)
+        else:
+            await update.message.reply_text(text, parse_mode="Markdown", **kwargs)
+        return
+    except Exception:
+        pass
+
+    # Second attempt — fixed markdown
+    try:
+        fixed = fix_markdown(text)
+        if photo:
+            await update.message.reply_photo(photo=photo, caption=fixed, parse_mode="Markdown", **kwargs)
+        else:
+            await update.message.reply_text(fixed, parse_mode="Markdown", **kwargs)
+        return
+    except Exception:
+        pass
+
+    # Last resort — plain text (no formatting lost from story content)
+    if photo:
+        await update.message.reply_photo(photo=photo, caption=text, **kwargs)
+    else:
+        await update.message.reply_text(text, **kwargs)
+
+
+# ============================================================================
 # IMAGE GENERATION — 720x720, klein model, enhance=true
 # ============================================================================
 
@@ -363,11 +424,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(reveal_text, parse_mode="Markdown")
 
         # ── Step 5: AI opening reply with keyboard ───────────────────
-        await update.message.reply_text(
-            ai_reply,
-            reply_markup=utility_keyboard(),
-            parse_mode="Markdown"
-        )
+        await safe_send(update, ai_reply, reply_markup=utility_keyboard())
 
         session["message_count"]    = 1
         session["images_generated"] = 1
@@ -446,13 +503,9 @@ async def generate_reply(update, user_id, input_text):
 
             # Send response
             if image_bytes:
-                await update.message.reply_photo(
-                    photo=image_bytes,
-                    caption=ai_reply,
-                    parse_mode="Markdown"
-                )
+                await safe_send(update, ai_reply, photo=image_bytes)
             else:
-                await update.message.reply_text(ai_reply, parse_mode="Markdown")
+                await safe_send(update, ai_reply)
 
         else:
             # ── SEQUENTIAL: RP only, no image ────────────────────────
@@ -476,7 +529,10 @@ async def generate_reply(update, user_id, input_text):
                 session["last_20_messages"] = 0
                 logging.info("🔄 Image counter reset")
 
-            await update.message.reply_text(ai_reply, parse_mode="Markdown")
+            try:
+                await safe_send(update, ai_reply)
+            except Exception:
+                await update.message.reply_text(ai_reply)
 
     except Exception as e:
         logging.error(f"❌ Reply error: {e}", exc_info=True)
