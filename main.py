@@ -312,11 +312,14 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "content": f"[SCENARIO]: {scenario}\n\nBegin the roleplay as {char_name}. Set the scene and make your first move."
         })
 
-        response = client_rp.chat.completions.create(
-            model=RP_MODEL,
-            messages=session["history"],
-            temperature=0.85,
-            max_tokens=95
+        response = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: client_rp.chat.completions.create(
+                model=RP_MODEL,
+                messages=session["history"],
+                temperature=0.85,
+                max_tokens=95
+            )
         )
 
         ai_reply = response.choices[0].message.content
@@ -399,11 +402,15 @@ async def generate_reply(update, user_id, input_text):
             logging.info("⚡ Parallel: RP reply + keywords firing together")
 
             async def get_rp_reply():
-                resp = client_rp.chat.completions.create(
-                    model=RP_MODEL,
-                    messages=trimmed,
-                    temperature=0.85,
-                    max_tokens=95
+                loop = asyncio.get_event_loop()
+                resp = await loop.run_in_executor(
+                    None,
+                    lambda: client_rp.chat.completions.create(
+                        model=RP_MODEL,
+                        messages=trimmed,
+                        temperature=0.85,
+                        max_tokens=95
+                    )
                 )
                 return resp.choices[0].message.content
 
@@ -449,11 +456,15 @@ async def generate_reply(update, user_id, input_text):
 
         else:
             # ── SEQUENTIAL: RP only, no image ────────────────────────
-            response = client_rp.chat.completions.create(
-                model=RP_MODEL,
-                messages=trimmed,
-                temperature=0.85,
-                max_tokens=95
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: client_rp.chat.completions.create(
+                    model=RP_MODEL,
+                    messages=trimmed,
+                    temperature=0.85,
+                    max_tokens=95
+                )
             )
             ai_reply = response.choices[0].message.content
             session["history"].append({"role": "assistant", "content": ai_reply})
@@ -468,7 +479,7 @@ async def generate_reply(update, user_id, input_text):
             await update.message.reply_text(ai_reply, parse_mode="Markdown")
 
     except Exception as e:
-        logging.error(f"❌ Reply error: {e}")
+        logging.error(f"❌ Reply error: {e}", exc_info=True)
         await update.message.reply_text(
             "🌑 _The void stirs but stays silent..._\n_Try again in a moment._",
             parse_mode="Markdown"
