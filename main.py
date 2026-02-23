@@ -1,11 +1,11 @@
 """
 HERMAX ROLEPLAY BOT
-Integrates: Telegram Bot + Web App + Grok AI + Pollinations Image Generation
+Integrates: Telegram Bot + Web App + Cerebras AI + Mistral AI + Pollinations Image Generation
 Character data loaded from characters.json
 
-Two Grok clients:
-  client_rp    — OPENROUTER_KEY        — RP text generation
-  client_img   — OPENROUTER_KEY_IMAGE  — keyword extraction (parallel)
+Two AI clients:
+  client_rp    — CEREBRAS_API_KEY    — RP text generation (llama3.1-8b)
+  client_img   — MISTRAL_API_KEY     — keyword extraction via Mistral agent (parallel)
 
 Image triggers:
   Preloaded characters : message 3, 7, then 30% random (max 6 per 20)
@@ -25,6 +25,7 @@ from flask import Flask
 from telegram import Update, WebAppInfo, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from openai import OpenAI
+from mistralai import Mistral
 from dotenv import load_dotenv
 
 # ============================================================================
@@ -34,12 +35,13 @@ from dotenv import load_dotenv
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-TOKEN                = os.getenv("TELEGRAM_BOT_TOKEN")
-OPENROUTER_KEY       = os.getenv("OPENROUTER_KEY")
-OPENROUTER_KEY_IMAGE = os.getenv("OPENROUTER_KEY_IMAGE")
-POLLINATIONS_KEY     = os.getenv("POLLINATIONS_API_KEY")
-WEBAPP_URL           = "https://usage217-tech.github.io/Mytho-rp/"
-MODEL                = "x-ai/grok-4.1-fast"
+TOKEN            = os.getenv("TELEGRAM_BOT_TOKEN")
+CEREBRAS_KEY     = os.getenv("CEREBRAS_API_KEY")
+MISTRAL_KEY      = os.getenv("MISTRAL_API_KEY")
+POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY")
+WEBAPP_URL       = "https://usage217-tech.github.io/Mytho-rp/"
+RP_MODEL         = "llama3.1-8b"
+MISTRAL_AGENT_ID = "ag_019c85bbf8f277ffafe698fe45909ac4"
 
 # ============================================================================
 # LOAD CHARACTER DATA
@@ -59,8 +61,8 @@ def is_anime(name):
 # INITIALIZE SERVICES — TWO SEPARATE GROK CLIENTS
 # ============================================================================
 
-client_rp  = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY)
-client_img = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY_IMAGE)
+client_rp  = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=CEREBRAS_KEY)
+client_img = Mistral(api_key=MISTRAL_KEY)
 app        = Flask(__name__)
 user_sessions = {}
 
@@ -129,7 +131,7 @@ def generate_scene_image(scene_keywords, char_name, reference_image_url=None):
 
 async def get_scene_keywords(recent_messages, char_name):
     """
-    Fires in PARALLEL with RP reply using client_img (separate Grok key).
+    Fires in PARALLEL with RP reply using Mistral agent.
     Reads last 5 messages for full scene context.
     Outputs exactly 6 comma-separated visual phrases.
     """
@@ -140,36 +142,47 @@ async def get_scene_keywords(recent_messages, char_name):
             if m['role'] != 'system'
         ])
 
-        response = client_img.chat.completions.create(
-            model=MODEL,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"You are a visual scene extractor for image generation.\n\n"
-                    f"Read these recent roleplay messages carefully:\n\n"
-                    f"{context}\n\n"
-                    f"Extract exactly 6 comma-separated words or short phrases describing:\n"
-                    f"- The background and location\n"
-                    f"- The lighting and atmosphere\n"
-                    f"- What {char_name} is doing or expressing ALONE\n\n"
-                    f"STRICT RULES:\n"
-                    f"- No interaction words (kissing, touching, holding, teaching)\n"
-                    f"- No second person (you, your, together, each other)\n"
-                    f"- Character actions must be solo only (finger in mouth, hands on hips, playful smirk)\n"
-                    f"- No emotion words (passionate, desire) — show through pose/expression instead\n\n"
-                    f"GOOD: moonlit garden, ivy wall, silver light, finger in mouth, playful gaze\n"
-                    f"GOOD: swimming pool, bright lights, playful smirk, hands on hips\n"
-                    f"BAD: kissing, holding you, passionate, together, touching each other\n\n"
-                    f"Output exactly 6 comma-separated phrases. Nothing else."
-                )
-            }],
-            temperature=0.5,
-            max_tokens=40
+        prompt = (
+            f"You are a visual scene extractor for image generation.\n\n"
+            f"Read these recent roleplay messages carefully:\n\n"
+            f"{context}\n\n"
+            f"Extract exactly 6 comma-separated words or short phrases describing:\n"
+            f"- The background and location\n"
+            f"- The lighting and atmosphere\n"
+            f"- What {char_name} is doing or expressing ALONE\n\n"
+            f"STRICT RULES:\n"
+            f"- No interaction words (kissing, touching, holding, teaching)\n"
+            f"- No second person (you, your, together, each other)\n"
+            f"- Character actions must be solo only (finger in mouth, hands on hips, playful smirk)\n"
+            f"- No emotion words (passionate, desire) — show through pose/expression instead\n\n"
+            f"GOOD: moonlit garden, ivy wall, silver light, finger in mouth, playful gaze\n"
+            f"GOOD: swimming pool, bright lights, playful smirk, hands on hips\n"
+            f"BAD: kissing, holding you, passionate, together, touching each other\n\n"
+            f"Output exactly 6 comma-separated phrases. Nothing else."
         )
 
-        keywords = response.choices[0].message.content.strip().replace('"', '').replace("'", '')
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: client_img.beta.conversations.start(
+                agent_id=MISTRAL_AGENT_ID,
+                inputs=[{"role": "user", "content": prompt}]
+            )
+        )
+
+        # Extract text from Mistral response
+        keywords = ""
+        for output in response.outputs:
+            if hasattr(output, 'content'):
+                for block in output.content:
+                    if hasattr(block, 'text'):
+                        keywords = block.text.strip().replace('"', '').replace("'", '')
+                        break
+            if keywords:
+                break
+
         logging.info(f"📝 Keywords: {keywords}")
-        return keywords
+        return keywords if keywords else None
 
     except Exception as e:
         logging.error(f"❌ Keyword error: {e}")
@@ -307,7 +320,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         })
 
         response = client_rp.chat.completions.create(
-            model=MODEL,
+            model=RP_MODEL,
             messages=session["history"],
             temperature=0.85,
             max_tokens=95
@@ -394,7 +407,7 @@ async def generate_reply(update, user_id, input_text):
 
             async def get_rp_reply():
                 resp = client_rp.chat.completions.create(
-                    model=MODEL,
+                    model=RP_MODEL,
                     messages=trimmed,
                     temperature=0.85,
                     max_tokens=95
@@ -444,7 +457,7 @@ async def generate_reply(update, user_id, input_text):
         else:
             # ── SEQUENTIAL: RP only, no image ────────────────────────
             response = client_rp.chat.completions.create(
-                model=MODEL,
+                model=RP_MODEL,
                 messages=trimmed,
                 temperature=0.85,
                 max_tokens=95
