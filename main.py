@@ -25,7 +25,8 @@ from flask import Flask
 from telegram import Update, WebAppInfo, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from openai import OpenAI
-from mistralai import Mistral
+from mistralai.client import MistralClient
+from mistralai.models.chat_completion import ChatMessage
 from dotenv import load_dotenv
 
 # ============================================================================
@@ -62,7 +63,7 @@ def is_anime(name):
 # ============================================================================
 
 client_rp  = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=CEREBRAS_KEY)
-client_img = Mistral(api_key=MISTRAL_KEY)
+client_img = MistralClient(api_key=MISTRAL_KEY)
 app        = Flask(__name__)
 user_sessions = {}
 
@@ -164,22 +165,14 @@ async def get_scene_keywords(recent_messages, char_name):
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
             None,
-            lambda: client_img.beta.conversations.start(
-                agent_id=MISTRAL_AGENT_ID,
-                inputs=[{"role": "user", "content": prompt}]
+            lambda: client_img.chat(
+                model="mistral-tiny",
+                messages=[ChatMessage(role="user", content=prompt)],
+                agent_id=MISTRAL_AGENT_ID
             )
         )
 
-        # Extract text from Mistral response
-        keywords = ""
-        for output in response.outputs:
-            if hasattr(output, 'content'):
-                for block in output.content:
-                    if hasattr(block, 'text'):
-                        keywords = block.text.strip().replace('"', '').replace("'", '')
-                        break
-            if keywords:
-                break
+        keywords = response.choices[0].message.content.strip().replace('"', '').replace("'", '')
 
         logging.info(f"📝 Keywords: {keywords}")
         return keywords if keywords else None
