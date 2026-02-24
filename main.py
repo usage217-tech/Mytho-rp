@@ -26,7 +26,8 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 TOKEN        = os.getenv("TELEGRAM_BOT_TOKEN")
-CEREBRAS_KEY = os.getenv("CEREBRAS_API_KEY")
+CEREBRAS_KEY_RP   = os.getenv("CEREBRAS_API_KEY_RP")      # For roleplay text
+CEREBRAS_KEY_IMG  = os.getenv("CEREBRAS_API_KEY_IMG")     # For image keywords
 POLL_KEY     = os.getenv("POLLINATIONS_API_KEY")
 WEBAPP_URL   = "https://usage217-tech.github.io/Mytho-rp/"
 RP_MODEL     = "llama3.1-8b"
@@ -46,11 +47,11 @@ def is_anime(name):
     return char and char.get("style", "Realistic") == "Anime"
 
 # ============================================================================
-# DUAL CEREBRAS CLIENTS (Same key, different purposes)
+# DUAL CEREBRAS CLIENTS (Two separate API keys)
 # ============================================================================
 
-client_rp  = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=CEREBRAS_KEY)  # Roleplay
-client_img = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=CEREBRAS_KEY_IMAGE)  # Image keywords
+client_rp  = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=CEREBRAS_KEY_RP)   # Roleplay
+client_img = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=CEREBRAS_KEY_IMG)  # Image keywords
 
 app = Flask(__name__)
 sessions = {}
@@ -124,7 +125,7 @@ def gen_image(keywords, char_name, ref_url=None):
         return (None, None)
 
 # ============================================================================
-# CEREBRAS KEYWORD EXTRACTION (Replaces Mistral)
+# CEREBRAS KEYWORD EXTRACTION (Uses separate client_img with CEREBRAS_KEY_IMG)
 # ============================================================================
 
 async def get_keywords(messages, char_name):
@@ -306,7 +307,7 @@ async def generate_reply(update, uid, text):
         fire_img = should_image(sess)
         
         if fire_img:
-            # Parallel: RP + Keywords
+            # Parallel: RP + Keywords (each uses their own client)
             async def get_rp():
                 loop = asyncio.get_event_loop()
                 r = await loop.run_in_executor(
