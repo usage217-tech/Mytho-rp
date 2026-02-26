@@ -54,7 +54,7 @@ MODEL            = "llama3.1-8b"
 # LOAD CHARACTER DATA
 # ============================================================================
 
-with open("characters.json", "r") as f:
+with open("Characters.json", "r") as f:
     CHARACTERS = json.load(f)
 
 def get_char(name):
