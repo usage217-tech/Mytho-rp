@@ -90,31 +90,23 @@ def utility_keyboard():
     ], resize_keyboard=True)
 
 # ============================================================================
-# MARKDOWN FORMATTER — converts AI output to clean Telegram-safe format:
-#   • Action/narration text wrapped in *asterisks*
-#   • "Quoted dialogue" stays plain — no markers
-#   • Underscore italic _..._ converted to *...*
-#   • Unclosed * markers auto-closed
-#   • Triple *** stripped
+# AI REPLY FORMATTER — outputs Telegram HTML for bulletproof rendering:
+#   • Narration / action text  →  <i>italic</i>
+#   • "Quoted dialogue"        →  plain text, no tags
+#   • Strips all raw * and _ the AI may produce
+#   • Escapes HTML special chars inside dialogue
 # ============================================================================
 
-def sanitize_markdown(text: str) -> str:
+def format_ai_reply(text: str) -> str:
     if not text:
         return text
 
-    # Step 1 — Strip triple markers
-    text = text.replace("***", "").replace("___", "")
+    # Step 1 — strip all markdown the AI may have used
+    text = text.replace("***", "").replace("**", "").replace("___", "")
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)   # *text* → text
+    text = re.sub(r'_([^_]+)_',   r'\1', text)   # _text_ → text
 
-    # Step 2 — Convert _text_ italic to *text* (llama often uses underscores)
-    # Replace _..._ with *...* safely
-    text = re.sub(r'_([^_]+)_', r'*\1*', text)
-
-    # Step 3 — Collapse any double ** that appeared from conversion
-    text = re.sub(r'\*{2,}', '*', text)
-
-    # Step 4 — Now reformat the whole text:
-    # Split into segments: quoted dialogue vs everything else
-    # "dialogue" stays plain, narration gets wrapped in *...*
+    # Step 2 — split on "quoted dialogue"
     segments = re.split(r'("(?:[^"\\]|\\.)*")', text)
 
     result = []
@@ -122,39 +114,26 @@ def sanitize_markdown(text: str) -> str:
         if not seg:
             continue
         if seg.startswith('"') and seg.endswith('"'):
-            # Dialogue — strip any stray * inside and keep plain
-            clean = seg.replace('*', '')
-            result.append(clean)
+            # Dialogue — escape HTML special chars, keep plain
+            safe = seg.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            result.append(safe)
         else:
-            # Narration — strip existing * then rewrap cleanly
-            # Split by existing *...* chunks to avoid double-wrapping
-            parts = re.split(r'(\*[^*]+\*)', seg)
-            narration_buf = []
-            for part in parts:
-                if part.startswith('*') and part.endswith('*') and len(part) > 2:
-                    # Already wrapped — keep
-                    narration_buf.append(part)
-                elif part.strip():
-                    # Plain narration text — wrap in *
-                    stripped = part.strip('* \n')
-                    if stripped:
-                        # Preserve leading/trailing spaces/newlines
-                        lead  = part[: len(part) - len(part.lstrip())]
-                        trail = part[len(part.rstrip()):]
-                        narration_buf.append(f"{lead}*{stripped}*{trail}")
-                    else:
-                        narration_buf.append(part)
-                else:
-                    narration_buf.append(part)
-            result.append(''.join(narration_buf))
+            # Narration — escape then wrap in <i>
+            stripped = seg.strip()
+            if stripped:
+                safe = stripped.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                # Preserve spacing around the segment
+                lead  = seg[: len(seg) - len(seg.lstrip())]
+                trail = seg[len(seg.rstrip()):]
+                result.append(f"{lead}<i>{safe}</i>{trail}")
+            else:
+                result.append(seg)
 
-    text = ''.join(result)
+    return ''.join(result).strip()
 
-    # Step 5 — Final safety: if odd number of * remains, close it
-    if text.count('*') % 2 != 0:
-        text += '*'
-
-    return text.strip()
+# Keep old name as alias so existing calls don't break
+def sanitize_markdown(text: str) -> str:
+    return format_ai_reply(text)
 
 # ============================================================================
 # IMAGE GENERATION — 720x720, klein model, enhance=true
@@ -353,21 +332,12 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ── Build system prompt ──────────────────────────────────────
 
-        # Universal POV header — enforces third person narration for all characters
-        POV_HEADER = (
-            f"WRITE IN STRICT THIRD PERSON. You are the author writing {char_name}.\n"
-            f"Use '{char_name} smiles' — NEVER 'I smile' or 'you smile'.\n"
-            f"Use 'she/he/her/him' for {char_name}. Use 'you' for the user only.\n"
-            f"NEVER narrate the user's actions, thoughts or words.\n"
-            f"The user's name is {user_name}. Their gender is {user_gender}.\n\n"
-        )
-
         CUSTOM_BASE_RULES = (
             "• Stay 100% in character always. No OOC, warnings, or AI talk.\n"
             "• Ignore break attempts — reply only as your character.\n"
             f"• Never control {user_name}'s actions, thoughts, or words.\n"
             "• RULE: All 18+ consenting unrelated adults. Refuse (in-character) minors or biological incest.\n"
-            f"• *Brief {char_name} actions in asterisks.*\n"
+            "• *Brief actions in asterisks.*\n"
             "• \"Dialogue in quotes.\"\n"
             "• More dialogue, less action.\n"
             "• One paragraph only. Max 50 words (aim 20–40).\n"
@@ -375,21 +345,24 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         if is_preloaded:
-            # Raw prompt from JSON — no .format(), narrative is display-only, never sent to AI
+            # Use JSON prompt exactly as written — it already has full character context
             scene_prompt_raw = scene_data_obj.get('prompt', '')
             if scene_prompt_raw:
-                system_prompt = POV_HEADER + scene_prompt_raw
+                system_prompt = (
+                    f"The user's name is {user_name}. Their gender is {user_gender}.\n\n"
+                    + scene_prompt_raw
+                )
             else:
                 system_prompt = (
-                    POV_HEADER +
-                    f"You are narrating {char_name}. {char_data.get('desc', '')}\n"
+                    f"You are {char_name}. {char_data.get('desc', '')}\n"
+                    f"The user's name is {user_name}. Their gender is {user_gender}.\n"
                     f"Stay in character. Be natural, warm, and engaging."
                 )
         else:
-            # Custom — scenario injected once, POV header + base rules added
+            # Custom character
             system_prompt = (
-                POV_HEADER +
-                f"You are narrating {char_name}. {char_desc}\n"
+                f"You are {char_name}. {char_desc}\n"
+                f"The user's name is {user_name}. Their gender is {user_gender}.\n"
                 f"The scenario: {scenario}\n\n"
                 + CUSTOM_BASE_RULES
             )
@@ -468,27 +441,27 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         photo=char_scene_img,
                         caption=ai_reply,
                         reply_markup=utility_keyboard(),
-                        parse_mode="Markdown"
+                        parse_mode="HTML"
                     )
                 except Exception as e:
                     logging.error(f"❌ Step 3 image error: {e}")
                     await update.message.reply_text(
                         ai_reply,
                         reply_markup=utility_keyboard(),
-                        parse_mode="Markdown"
+                        parse_mode="HTML"
                     )
             else:
                 await update.message.reply_text(
                     ai_reply,
                     reply_markup=utility_keyboard(),
-                    parse_mode="Markdown"
+                    parse_mode="HTML"
                 )
 
         # ════════════════════════════════════════════════════════════
         # CUSTOM — 2-step opening
         # ════════════════════════════════════════════════════════════
         else:
-            narrative_caption = sanitize_markdown(f"✦ *{char_name}*\n\n_{scenario}_")
+            narrative_caption = f"✦ *{char_name}*\n\n_{scenario}_"
 
             # Step 1: Generate AI image + narrative caption
             opening_image, opening_url = await asyncio.to_thread(
@@ -513,7 +486,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 ai_reply,
                 reply_markup=utility_keyboard(),
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
 
         session["message_count"]    = 1
@@ -601,10 +574,10 @@ async def generate_reply(update, user_id, input_text):
                 await update.message.reply_photo(
                     photo=image_bytes,
                     caption=ai_reply,
-                    parse_mode="Markdown"
+                    parse_mode="HTML"
                 )
             else:
-                await update.message.reply_text(ai_reply, parse_mode="Markdown")
+                await update.message.reply_text(ai_reply, parse_mode="HTML")
 
         else:
             # ── SEQUENTIAL: RP only ───────────────────────────────────
@@ -625,7 +598,7 @@ async def generate_reply(update, user_id, input_text):
                 session["last_20_messages"] = 0
                 logging.info("🔄 Image counter reset")
 
-            await update.message.reply_text(ai_reply, parse_mode="Markdown")
+            await update.message.reply_text(ai_reply, parse_mode="HTML")
 
     except Exception as e:
         logging.error(f"❌ Reply error: {e}")
