@@ -54,7 +54,7 @@ MODEL            = "llama3.1-8b"
 # LOAD CHARACTER DATA
 # ============================================================================
 
-with open("Characters.json", "r") as f:
+with open("Charecters.json", "r") as f:
     CHARACTERS = json.load(f)
 
 def get_char(name):
@@ -102,7 +102,7 @@ def generate_scene_image(scene_keywords, char_name, reference_image_url=None):
         encoded_prompt = quote(build_image_prompt(scene_keywords, char_name))
         seed           = random.randint(0, 999999)
 
-        base_url = f"https://gen.pollinations.ai/image/{encoded_prompt}"
+        base_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}"
         params   = [
             "model=klein",
             "width=720",
@@ -142,7 +142,8 @@ async def get_scene_keywords(recent_messages, char_name):
             if m['role'] != 'system'
         ])
 
-        response = client_img.chat.completions.create(
+        response = await asyncio.to_thread(
+            client_img.chat.completions.create,
             model=MODEL,
             messages=[{
                 "role": "user",
@@ -284,11 +285,8 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ── Build system prompt ──────────────────────────────────────
         if is_preloaded:
-            # Each scene has its own prompt — look up by scene_index sent from web app
-            scene_index = int(data.get('scene_index', 0))
-            scenes      = char_data.get('scenes', [])
-            scene_data  = scenes[scene_index] if scene_index < len(scenes) else (scenes[0] if scenes else {})
-            scene_prompt_template = scene_data.get('prompt', '')
+            # Use scene_data_obj already loaded above
+            scene_prompt_template = scene_data_obj.get('prompt', '')
 
             if scene_prompt_template:
                 system_prompt = scene_prompt_template.format(
@@ -315,7 +313,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_sessions[user_id] = {
             "history":          [{"role": "system", "content": system_prompt}],
             "char_name":        char_name,
-            "char_desc":        char_data.get("desc", "") if is_preloaded else char_desc,
+            "char_desc":        char_data.get("desc", "") if is_preloaded and char_data else char_desc,
             "scenario":         scenario,
             "reference_image":  reference_image,
             "is_preloaded":     is_preloaded,
@@ -332,7 +330,8 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "content": f"[SCENARIO]: {scenario}\n\nBegin the roleplay as {char_name}. Set the scene and make your first move."
         })
 
-        response = client_rp.chat.completions.create(
+        response = await asyncio.to_thread(
+            client_rp.chat.completions.create,
             model=MODEL,
             messages=session["history"],
             temperature=0.85,
@@ -407,10 +406,11 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             narrative_caption = f"✦ *{char_name}*\n\n_{scenario}_"
 
             # Step 1: Generate AI image + narrative caption
-            opening_image, opening_url = generate_scene_image(
-                scene_keywords=f"{scenario}, cinematic, atmospheric",
-                char_name=char_name,
-                reference_image_url=char_image if char_image else None
+            opening_image, opening_url = await asyncio.to_thread(
+                generate_scene_image,
+                f"{scenario}, cinematic, atmospheric",
+                char_name,
+                char_image if char_image else None
             )
             if opening_url:
                 session["reference_image"] = opening_url
@@ -469,7 +469,8 @@ async def generate_reply(update, user_id, input_text):
             logging.info("⚡ Parallel: RP + keywords firing together")
 
             async def get_rp_reply():
-                resp = client_rp.chat.completions.create(
+                resp = await asyncio.to_thread(
+                    client_rp.chat.completions.create,
                     model=MODEL,
                     messages=trimmed,
                     temperature=0.85,
@@ -498,10 +499,11 @@ async def generate_reply(update, user_id, input_text):
             # Generate image
             image_bytes = None
             if keywords:
-                image_bytes, _ = generate_scene_image(
-                    scene_keywords=keywords,
-                    char_name=session["char_name"],
-                    reference_image_url=session.get("reference_image")
+                image_bytes, _ = await asyncio.to_thread(
+                    generate_scene_image,
+                    keywords,
+                    session["char_name"],
+                    session.get("reference_image")
                 )
                 if image_bytes:
                     session["images_generated"] += 1
@@ -519,7 +521,8 @@ async def generate_reply(update, user_id, input_text):
 
         else:
             # ── SEQUENTIAL: RP only ───────────────────────────────────
-            response = client_rp.chat.completions.create(
+            response = await asyncio.to_thread(
+                client_rp.chat.completions.create,
                 model=MODEL,
                 messages=trimmed,
                 temperature=0.85,
