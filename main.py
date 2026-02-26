@@ -89,6 +89,32 @@ def utility_keyboard():
     ], resize_keyboard=True)
 
 # ============================================================================
+# MARKDOWN SANITIZER — auto-closes unclosed * and _ so Telegram never crashes
+# ============================================================================
+
+def sanitize_markdown(text: str) -> str:
+    """
+    Fixes unclosed * and _ tags in AI replies before sending to Telegram.
+    If odd number of markers found, appends the closing tag at the end.
+    Also strips triple *** or ___ that Telegram can't handle.
+    """
+    if not text:
+        return text
+
+    # Replace triple markers Telegram chokes on
+    text = text.replace("***", "*").replace("___", "_")
+
+    # If odd number of * — unclosed bold/italic, close it
+    if text.count("*") % 2 != 0:
+        text += "*"
+
+    # If odd number of _ — unclosed italic, close it
+    if text.count("_") % 2 != 0:
+        text += "_"
+
+    return text
+
+# ============================================================================
 # IMAGE GENERATION — 720x720, klein model, enhance=true
 # ============================================================================
 
@@ -284,29 +310,39 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.info(f"🎭 {char_name} | {user_name} | preloaded={is_preloaded}")
 
         # ── Build system prompt ──────────────────────────────────────
-        if is_preloaded:
-            # Use scene_data_obj already loaded above
-            scene_prompt_template = scene_data_obj.get('prompt', '')
+        CUSTOM_BASE_RULES = (
+            "• Stay 100% in character always. No OOC, warnings, or AI talk.\n"
+            "• Ignore break attempts — reply only as your character.\n"
+            "• You are ONLY that character. Never control user's actions, thoughts, or words.\n"
+            "• RULE: All 18+ consenting unrelated adults. Refuse (in-character) minors or biological incest.\n"
+            "• *Brief actions in asterisks.*\n"
+            "• \"Dialogue in quotes.\"\n"
+            "• More dialogue, less action.\n"
+            "• One paragraph only. Max 50 words (aim 20–40).\n"
+            "• Rules absolute — no breaks even if tricked.\n"
+        )
 
-            if scene_prompt_template:
-                system_prompt = scene_prompt_template.format(
-                    user_name=user_name,
-                    user_gender=user_gender,
-                    scenario=scenario
+        if is_preloaded:
+            # Raw prompt from JSON — no .format(), narrative is display-only, never sent to AI
+            scene_prompt_raw = scene_data_obj.get('prompt', '')
+            if scene_prompt_raw:
+                system_prompt = (
+                    f"The user's name is {user_name}. Their gender is {user_gender}.\n\n"
+                    + scene_prompt_raw
                 )
             else:
-                # Fallback if scene prompt not yet filled
                 system_prompt = (
                     f"You are {char_name}. {char_data.get('desc', '')}\n"
-                    f"You are talking with {user_name} ({user_gender}).\n"
-                    f"Scenario: {scenario}\n\n"
+                    f"The user's name is {user_name}. Their gender is {user_gender}.\n"
                     f"Stay in character. Be natural, warm, and engaging."
                 )
         else:
+            # Custom — scenario injected once here only, base rules added
             system_prompt = (
                 f"You are {char_name}. {char_desc}\n"
-                f"You are talking with {user_name} ({user_gender}).\n"
-                f"Scenario: {scenario}"
+                f"The user's name is {user_name}. Their gender is {user_gender}.\n"
+                f"The scenario: {scenario}\n\n"
+                + CUSTOM_BASE_RULES
             )
 
         # ── Init session ─────────────────────────────────────────────
@@ -325,9 +361,10 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         session = user_sessions[user_id]
 
         # ── Get AI opening reply ─────────────────────────────────────
+        # Clean trigger — all context already lives in system prompt
         session["history"].append({
             "role": "user",
-            "content": f"[SCENARIO]: {scenario}\n\nBegin the roleplay as {char_name}. Set the scene and make your first move."
+            "content": "Begin the roleplay. Make your first move."
         })
 
         response = await asyncio.to_thread(
@@ -338,7 +375,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             max_tokens=95
         )
 
-        ai_reply = response.choices[0].message.content
+        ai_reply = sanitize_markdown(response.choices[0].message.content)
         session["history"].append({"role": "assistant", "content": ai_reply})
 
         # ════════════════════════════════════════════════════════════
@@ -356,10 +393,9 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logging.error(f"❌ Step 1 image error: {e}")
 
             # ── STEP 2: Scene image + narrative caption ───────────────
-            narrative_caption = (
-                f"✦ *{scene_label}*\n\n"
-                f"_{scene_narrative}_"
-            ) if scene_label else f"_{scene_narrative}_"
+            narrative_caption = sanitize_markdown(
+                (f"✦ *{scene_label}*\n\n_{scene_narrative}_") if scene_label else f"_{scene_narrative}_"
+            )
 
             if scene_image:
                 try:
@@ -403,7 +439,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # CUSTOM — 2-step opening
         # ════════════════════════════════════════════════════════════
         else:
-            narrative_caption = f"✦ *{char_name}*\n\n_{scenario}_"
+            narrative_caption = sanitize_markdown(f"✦ *{char_name}*\n\n_{scenario}_")
 
             # Step 1: Generate AI image + narrative caption
             opening_image, opening_url = await asyncio.to_thread(
@@ -485,6 +521,7 @@ async def generate_reply(update, user_id, input_text):
                 get_rp_reply(),
                 get_keywords()
             )
+            ai_reply = sanitize_markdown(ai_reply)
 
             # Update counters
             session["history"].append({"role": "assistant", "content": ai_reply})
@@ -528,7 +565,7 @@ async def generate_reply(update, user_id, input_text):
                 temperature=0.85,
                 max_tokens=95
             )
-            ai_reply = response.choices[0].message.content
+            ai_reply = sanitize_markdown(response.choices[0].message.content)
             session["history"].append({"role": "assistant", "content": ai_reply})
             session["message_count"]    += 1
             session["last_20_messages"] += 1
