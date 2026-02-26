@@ -90,12 +90,21 @@ def utility_keyboard():
     ], resize_keyboard=True)
 
 # ============================================================================
-# AI REPLY FORMATTER — outputs Telegram HTML for bulletproof rendering:
-#   • Narration / action text  →  <i>italic</i>
-#   • "Quoted dialogue"        →  plain text, no tags
-#   • Strips all raw * and _ the AI may produce
-#   • Escapes HTML special chars inside dialogue
+# AI REPLY FORMATTER — outputs MarkdownV2 with *asterisks* for narration:
+#   • Narration / action text  →  *italic asterisks*
+#   • "Quoted dialogue"        →  plain text, no markers
+#   • Strips all raw * and _ the AI produces first
+#   • Escapes all MarkdownV2 special chars so Telegram never breaks
 # ============================================================================
+
+# MarkdownV2 special chars that must be escaped outside formatting
+_MDV2_SPECIAL = r'\_[]()~`>#+-=|{}.!'
+
+def _escape_mdv2(text: str) -> str:
+    """Escape all MarkdownV2 special chars in plain text segments."""
+    for ch in _MDV2_SPECIAL:
+        text = text.replace(ch, f'\\{ch}')
+    return text
 
 def format_ai_reply(text: str) -> str:
     if not text:
@@ -114,24 +123,22 @@ def format_ai_reply(text: str) -> str:
         if not seg:
             continue
         if seg.startswith('"') and seg.endswith('"'):
-            # Dialogue — escape HTML special chars, keep plain
-            safe = seg.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            result.append(safe)
+            # Dialogue — escape MDv2 special chars, keep plain (no markers)
+            result.append(_escape_mdv2(seg))
         else:
-            # Narration — escape then wrap in <i>
+            # Narration — escape then wrap in *asterisks*
             stripped = seg.strip()
             if stripped:
-                safe = stripped.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                # Preserve spacing around the segment
+                escaped = _escape_mdv2(stripped)
                 lead  = seg[: len(seg) - len(seg.lstrip())]
                 trail = seg[len(seg.rstrip()):]
-                result.append(f"{lead}<i>{safe}</i>{trail}")
+                result.append(f"{lead}*{escaped}*{trail}")
             else:
                 result.append(seg)
 
     return ''.join(result).strip()
 
-# Keep old name as alias so existing calls don't break
+# Alias
 def sanitize_markdown(text: str) -> str:
     return format_ai_reply(text)
 
@@ -415,7 +422,8 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logging.error(f"❌ Step 1 image error: {e}")
 
             # ── STEP 2: Scene image + narrative caption ───────────────
-            narrative_caption = sanitize_markdown(
+            # Hand-written Markdown string — sent with parse_mode Markdown, not HTML
+            narrative_caption = (
                 (f"✦ *{scene_label}*\n\n_{scene_narrative}_") if scene_label else f"_{scene_narrative}_"
             )
 
@@ -441,20 +449,20 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         photo=char_scene_img,
                         caption=ai_reply,
                         reply_markup=utility_keyboard(),
-                        parse_mode="HTML"
+                        parse_mode="MarkdownV2"
                     )
                 except Exception as e:
                     logging.error(f"❌ Step 3 image error: {e}")
                     await update.message.reply_text(
                         ai_reply,
                         reply_markup=utility_keyboard(),
-                        parse_mode="HTML"
+                        parse_mode="MarkdownV2"
                     )
             else:
                 await update.message.reply_text(
                     ai_reply,
                     reply_markup=utility_keyboard(),
-                    parse_mode="HTML"
+                    parse_mode="MarkdownV2"
                 )
 
         # ════════════════════════════════════════════════════════════
@@ -486,7 +494,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 ai_reply,
                 reply_markup=utility_keyboard(),
-                parse_mode="HTML"
+                parse_mode="MarkdownV2"
             )
 
         session["message_count"]    = 1
@@ -574,10 +582,10 @@ async def generate_reply(update, user_id, input_text):
                 await update.message.reply_photo(
                     photo=image_bytes,
                     caption=ai_reply,
-                    parse_mode="HTML"
+                    parse_mode="MarkdownV2"
                 )
             else:
-                await update.message.reply_text(ai_reply, parse_mode="HTML")
+                await update.message.reply_text(ai_reply, parse_mode="MarkdownV2")
 
         else:
             # ── SEQUENTIAL: RP only ───────────────────────────────────
@@ -598,7 +606,7 @@ async def generate_reply(update, user_id, input_text):
                 session["last_20_messages"] = 0
                 logging.info("🔄 Image counter reset")
 
-            await update.message.reply_text(ai_reply, parse_mode="HTML")
+            await update.message.reply_text(ai_reply, parse_mode="MarkdownV2")
 
     except Exception as e:
         logging.error(f"❌ Reply error: {e}")
