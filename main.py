@@ -3,9 +3,9 @@ HERMAX ROLEPLAY BOT
 Integrates: Telegram Bot + Web App + Cerebras AI + Pollinations Image Generation
 Character data loaded from Charecters.json
 
-Two Cerebras clients:
-  client_rp  - CEREBRAS_API_KEY_RP  - RP text generation
-  client_img - CEREBRAS_API_KEY_IMG - keyword extraction (parallel)
+Two clients:
+  client_rp  - MISTRAL_API_KEY         - RP text generation (Mistral Agent)
+  client_img - CEREBRAS_API_KEY_IMG    - keyword extraction (parallel)
 
 Opening flow (preloaded characters):
   Step 1 - Character's main image (from JSON)
@@ -35,6 +35,7 @@ from flask import Flask
 from telegram import Update, WebAppInfo, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from openai import OpenAI
+from mistralai import Mistral
 from dotenv import load_dotenv
 
 # ============================================================================
@@ -48,6 +49,8 @@ TOKEN            = os.getenv("TELEGRAM_BOT_TOKEN")
 CEREBRAS_KEY_RP  = os.getenv("CEREBRAS_API_KEY_RP")
 CEREBRAS_KEY_IMG = os.getenv("CEREBRAS_API_KEY_IMG")
 POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY")
+MISTRAL_KEY      = os.getenv("MISTRAL_API_KEY")
+MISTRAL_AGENT_ID = "ag_019c85bbf8f277ffafe698fe45909ac4"
 WEBAPP_URL       = "https://usage217-tech.github.io/Mytho-rp/"
 MODEL            = "llama3.1-8b"
 
@@ -65,7 +68,7 @@ def get_char(name):
 # INITIALIZE SERVICES - TWO SEPARATE CEREBRAS CLIENTS
 # ============================================================================
 
-client_rp  = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=CEREBRAS_KEY_RP)
+client_rp  = Mistral(api_key=MISTRAL_KEY)
 client_img = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=CEREBRAS_KEY_IMG)
 app        = Flask(__name__)
 user_sessions = {}
@@ -320,15 +323,13 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         })
 
         response = await asyncio.to_thread(
-            client_rp.chat.completions.create,
-            model=MODEL,
-            messages=session["history"],
-            temperature=0.85,
-            max_tokens=95
+            client_rp.beta.conversations.start,
+            agent_id=MISTRAL_AGENT_ID,
+            inputs=session["history"][1:]  # exclude system (agent handles it)
         )
 
         # Send AI text RAW - no formatting, no parse_mode
-        ai_reply = response.choices[0].message.content.strip()
+        ai_reply = response.outputs[-1].content[0].text.strip()
         session["history"].append({"role": "assistant", "content": ai_reply})
 
         # ════════════════════════════════════════════════════════════
@@ -457,13 +458,11 @@ async def generate_reply(update, user_id, input_text):
 
             async def get_rp_reply():
                 resp = await asyncio.to_thread(
-                    client_rp.chat.completions.create,
-                    model=MODEL,
-                    messages=trimmed,
-                    temperature=0.85,
-                    max_tokens=95
+                    client_rp.beta.conversations.start,
+                    agent_id=MISTRAL_AGENT_ID,
+                    inputs=recent[-8:]
                 )
-                return resp.choices[0].message.content.strip()
+                return resp.outputs[-1].content[0].text.strip()
 
             async def get_keywords():
                 return await get_scene_keywords(recent, session["char_name"])
@@ -509,13 +508,11 @@ async def generate_reply(update, user_id, input_text):
         else:
             # Sequential - RP only
             response = await asyncio.to_thread(
-                client_rp.chat.completions.create,
-                model=MODEL,
-                messages=trimmed,
-                temperature=0.85,
-                max_tokens=95
+                client_rp.beta.conversations.start,
+                agent_id=MISTRAL_AGENT_ID,
+                inputs=recent[-8:]
             )
-            ai_reply = response.choices[0].message.content.strip()
+            ai_reply = response.outputs[-1].content[0].text.strip()
             session["history"].append({"role": "assistant", "content": ai_reply})
             session["message_count"]    += 1
             session["last_20_messages"] += 1
