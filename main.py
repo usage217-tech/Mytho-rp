@@ -329,7 +329,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Send AI text RAW - no formatting, no parse_mode
-        ai_reply = response.outputs[-1].content[0].text.strip()
+        ai_reply = response.outputs[-1].content[0].strip()
         session["history"].append({"role": "assistant", "content": ai_reply})
 
         # ════════════════════════════════════════════════════════════
@@ -462,7 +462,7 @@ async def generate_reply(update, user_id, input_text):
                     agent_id=MISTRAL_AGENT_ID,
                     inputs=recent[-8:]
                 )
-                return resp.outputs[-1].content[0].text.strip()
+                return resp.outputs[-1].content[0].strip()
 
             async def get_keywords():
                 return await get_scene_keywords(recent, session["char_name"])
@@ -512,7 +512,7 @@ async def generate_reply(update, user_id, input_text):
                 agent_id=MISTRAL_AGENT_ID,
                 inputs=recent[-8:]
             )
-            ai_reply = response.outputs[-1].content[0].text.strip()
+            ai_reply = response.outputs[-1].content[0].strip()
             session["history"].append({"role": "assistant", "content": ai_reply})
             session["message_count"]    += 1
             session["last_20_messages"] += 1
