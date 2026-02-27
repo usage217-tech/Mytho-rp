@@ -26,7 +26,6 @@ import json
 import asyncio
 import logging
 import random
-import re
 import requests
 from io import BytesIO
 from threading import Thread
@@ -46,7 +45,6 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 TOKEN            = os.getenv("TELEGRAM_BOT_TOKEN")
-CEREBRAS_KEY_RP  = os.getenv("CEREBRAS_API_KEY_RP")
 CEREBRAS_KEY_IMG = os.getenv("CEREBRAS_API_KEY_IMG")
 POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY")
 MISTRAL_KEY      = os.getenv("MISTRAL_API_KEY")
@@ -72,6 +70,32 @@ client_rp  = Mistral(api_key=MISTRAL_KEY)
 client_img = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=CEREBRAS_KEY_IMG)
 app        = Flask(__name__)
 user_sessions = {}
+
+# ============================================================================
+# MISTRAL RESPONSE PARSER - safely extracts text from any response structure
+# ============================================================================
+
+def extract_mistral_reply(response):
+    """Robustly extract text from Mistral conversations.start() response."""
+    try:
+        output = response.outputs[-1]
+        content = output.content
+        # content is a string
+        if isinstance(content, str):
+            return content.strip()
+        # content is a list of objects with .text
+        if isinstance(content, list):
+            parts = []
+            for block in content:
+                if hasattr(block, 'text'):
+                    parts.append(block.text)
+                elif isinstance(block, str):
+                    parts.append(block)
+            return "".join(parts).strip()
+        return str(content).strip()
+    except Exception as e:
+        logging.error(f"❌ Failed to parse Mistral response: {e} | raw: {response}")
+        return "..."
 
 # ============================================================================
 # KEYBOARDS
@@ -329,7 +353,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Send AI text RAW - no formatting, no parse_mode
-        ai_reply = response.outputs[-1].content[0].strip()
+        ai_reply = extract_mistral_reply(response)
         session["history"].append({"role": "assistant", "content": ai_reply})
 
         # ════════════════════════════════════════════════════════════
@@ -449,7 +473,8 @@ async def generate_reply(update, user_id, input_text):
     try:
         system_msg = session["history"][0]
         recent     = session["history"][1:]
-        trimmed    = [system_msg] + recent[-8:]
+        # Only pass non-system messages to Mistral agent (agent has its own system prompt)
+        rp_inputs  = [m for m in recent[-8:] if m.get("role") != "system"]
 
         fire_image = should_generate_image(session)
 
@@ -460,9 +485,9 @@ async def generate_reply(update, user_id, input_text):
                 resp = await asyncio.to_thread(
                     client_rp.beta.conversations.start,
                     agent_id=MISTRAL_AGENT_ID,
-                    inputs=recent[-8:]
+                    inputs=rp_inputs
                 )
-                return resp.outputs[-1].content[0].strip()
+                return extract_mistral_reply(resp)
 
             async def get_keywords():
                 return await get_scene_keywords(recent, session["char_name"])
@@ -510,9 +535,9 @@ async def generate_reply(update, user_id, input_text):
             response = await asyncio.to_thread(
                 client_rp.beta.conversations.start,
                 agent_id=MISTRAL_AGENT_ID,
-                inputs=recent[-8:]
+                inputs=rp_inputs
             )
-            ai_reply = response.outputs[-1].content[0].strip()
+            ai_reply = extract_mistral_reply(response)
             session["history"].append({"role": "assistant", "content": ai_reply})
             session["message_count"]    += 1
             session["last_20_messages"] += 1
