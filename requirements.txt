@@ -1,6 +1,6 @@
 python-telegram-bot==21.6
 openai
-mistralai==1.5.1
+mistralai>=1.7.0
 cerebras-cloud-sdk
 flask
 requests
