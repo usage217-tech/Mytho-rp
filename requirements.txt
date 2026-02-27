@@ -1,4 +1,4 @@
-python-telegram-bot==20.8
+python-telegram-bot==21.6
 openai
 mistralai==1.5.1
 cerebras-cloud-sdk
