@@ -95,13 +95,30 @@ def extract_mistral_reply(response):
         return "..."
 
 def clean_reply(text):
-    """Remove single-word emphasis asterisks like *James* *dangerous* *real*
-    but keep multi-word actions like *leans in* *laughs softly*"""
+    """
+    1. Remove single-word emphasis asterisks: *James* *real* *dangerous* -> word only
+    2. Keep multi-word actions: *leans in* *laughs softly* -> untouched
+    3. Max 2 action blocks per reply — strip extras beyond that
+    """
     import re
-    # *single_word* → strip asterisks (emphasis)
-    # *multiple words* → keep (physical action)
-    text = re.sub(r'\*(\w+)\*', r'\1', text)
-    return text.strip()
+
+    # Step 1 — strip single word emphasis, keep multi-word actions
+    def replace_asterisk(m):
+        inner = m.group(1)
+        if ' ' in inner:
+            return m.group(0)  # multi-word = action = keep
+        return inner           # single word = emphasis = strip
+
+    text = re.sub(r'\*([^*]+)\*', replace_asterisk, text)
+
+    # Step 2 — max 2 action blocks per reply
+    actions = re.findall(r'\*[^*]+\*', text)
+    if len(actions) > 2:
+        for action in actions[2:]:
+            text = text.replace(action, '', 1)
+
+    text = re.sub(r' +', ' ', text).strip()
+    return text
 
 # ============================================================================
 # KEYBOARDS
@@ -485,11 +502,8 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def generate_reply(update, user_id, input_text):
     session = user_sessions[user_id]
 
-    wrapped = (
-        f"{input_text}\n\n"
-        f"[Stay in character. Follow the prompt. Reply max 50 words, aim 20-40.]"
-    )
-    session["history"].append({"role": "user", "content": wrapped})
+    # Store user message clean — no wrapper polluting rhythm
+    session["history"].append({"role": "user", "content": input_text})
 
     try:
         recent    = session["history"][1:]
@@ -706,4 +720,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
