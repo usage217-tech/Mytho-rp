@@ -4,7 +4,7 @@ Integrates: Telegram Bot + Web App + Cerebras AI + Pollinations Image Generation
 Character data loaded from Charecters.json
 
 Two clients:
-  client_rp  - MISTRAL_API_KEY         - RP text generation (Mistral Agent)
+  client_rp  - MISTRAL_API_KEY         - RP text generation (labs-mistral-small-creative via chat.complete)
   client_img - CEREBRAS_API_KEY_IMG    - keyword extraction (parallel)
 
 Opening flow (preloaded characters):
@@ -48,7 +48,7 @@ TOKEN            = os.getenv("TELEGRAM_BOT_TOKEN")
 CEREBRAS_KEY_IMG = os.getenv("CEREBRAS_API_KEY_IMG")
 POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY")
 MISTRAL_KEY      = os.getenv("MISTRAL_API_KEY")
-MISTRAL_AGENT_ID = "ag_019c85bbf8f277ffafe698fe45909ac4"
+RP_MODEL       = "labs-mistral-small-creative"
 WEBAPP_URL       = "https://usage217-tech.github.io/Mytho-rp/"
 MODEL            = "llama3.1-8b"
 
@@ -76,14 +76,11 @@ user_sessions = {}
 # ============================================================================
 
 def extract_mistral_reply(response):
-    """Robustly extract text from Mistral conversations.start() response."""
+    """Robustly extract text from Mistral chat.complete() response."""
     try:
-        output = response.outputs[-1]
-        content = output.content
-        # content is a string
+        content = response.choices[0].message.content
         if isinstance(content, str):
             return content.strip()
-        # content is a list of objects with .text
         if isinstance(content, list):
             parts = []
             for block in content:
@@ -330,7 +327,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "history":          [{"role": "system", "content": system_prompt}],
             "char_name":        char_name,
             "char_desc":        char_data.get("desc", "") if is_preloaded and char_data else char_desc,
-            "scenario":         scenario,
+            "scenario":         scene_narrative if is_preloaded else scenario,
             "reference_image":  reference_image,
             "is_preloaded":     is_preloaded,
             "message_count":    0,
@@ -347,9 +344,9 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         })
 
         response = await asyncio.to_thread(
-            client_rp.beta.conversations.start,
-            agent_id=MISTRAL_AGENT_ID,
-            inputs=session["history"][1:]  # exclude system (agent handles it)
+            client_rp.chat.complete,
+            model=RP_MODEL,
+            messages=session["history"]  # system prompt at [0] goes directly to model
         )
 
         # Send AI text RAW - no formatting, no parse_mode
@@ -471,10 +468,9 @@ async def generate_reply(update, user_id, input_text):
     session["history"].append({"role": "user", "content": wrapped})
 
     try:
-        system_msg = session["history"][0]
-        recent     = session["history"][1:]
-        # Only pass non-system messages to Mistral agent (agent has its own system prompt)
-        rp_inputs  = [m for m in recent[-8:] if m.get("role") != "system"]
+        recent    = session["history"][1:]
+        # Pass system prompt + last 8 messages so model always has full character context
+        rp_inputs = [session["history"][0]] + recent[-8:]
 
         fire_image = should_generate_image(session)
 
@@ -483,9 +479,9 @@ async def generate_reply(update, user_id, input_text):
 
             async def get_rp_reply():
                 resp = await asyncio.to_thread(
-                    client_rp.beta.conversations.start,
-                    agent_id=MISTRAL_AGENT_ID,
-                    inputs=rp_inputs
+                    client_rp.chat.complete,
+                    model=RP_MODEL,
+                    messages=rp_inputs
                 )
                 return extract_mistral_reply(resp)
 
@@ -533,9 +529,9 @@ async def generate_reply(update, user_id, input_text):
         else:
             # Sequential - RP only
             response = await asyncio.to_thread(
-                client_rp.beta.conversations.start,
-                agent_id=MISTRAL_AGENT_ID,
-                inputs=rp_inputs
+                client_rp.chat.complete,
+                model=RP_MODEL,
+                messages=rp_inputs
             )
             ai_reply = extract_mistral_reply(response)
             session["history"].append({"role": "assistant", "content": ai_reply})
