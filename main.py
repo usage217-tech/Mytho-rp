@@ -48,7 +48,7 @@ TOKEN            = os.getenv("TELEGRAM_BOT_TOKEN")
 CEREBRAS_KEY_IMG = os.getenv("CEREBRAS_API_KEY_IMG")
 POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY")
 MISTRAL_KEY      = os.getenv("MISTRAL_API_KEY")
-RP_MODEL       = "mistral-medium-latest"
+RP_MODEL       = "labs-mistral-small-creative"
 WEBAPP_URL       = "https://usage217-tech.github.io/Mytho-rp/"
 MODEL            = "llama3.1-8b"
 
