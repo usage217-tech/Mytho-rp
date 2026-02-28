@@ -298,7 +298,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "1. You are TALKING WITH the user, not writing a story.\n"
             "2. NEVER narrate scenes, environments, atmosphere, or cinematic descriptions.\n"
             "3. NEVER introduce settings like a novel opening.\n"
-            "4. Reply like speaking in real life.\n"
+            "4. Respond as spoken dialogue with brief reactions only.\n"
             "5. Stay 100% in character at all times.\n"
             "6. Never control the user's actions, thoughts, or dialogue.\n"
             "7. Dialogue drives everything — personality shows through speech.\n"
@@ -306,32 +306,34 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "9. No long descriptions, no poetry, no inner monologue.\n"
             "10. Keep replies SHORT and reactive.\n\n"
             "11. Scene information is knowledge, NOT narration material.\n"
+            "12. Always prioritize reacting to the user's latest message over creating new dramatic actions.\n"
             "STYLE RULES:\n"
-            "- Write responses as a single paragraph only. no splitting \n"
-            "- No line breaks or separated narration blocks.\n"
+            "- Output must be ONE single paragraph with NO line breaks under any circumstance.\n"
             "- Avoid excessive asterisks or action spam.\n"
             "- Use few short actions and mostly dialogue.\n"
             "- Target ratio: ~70% dialogue, ~30% brief actions.\n"
         )
 
         # ── Build system prompt ──────────────────────────────────────
-        if is_preloaded:
-            scene_prompt_raw = scene_data_obj.get('prompt', '')
-            if not scene_prompt_raw:
-                scene_prompt_raw = f"You are {char_name}. {char_data.get('desc', '')}. Be natural and engaging."
-            system_prompt = BASE_RULES + "\nCHARACTER & SCENE:\n" + scene_prompt_raw
-        else:
-            # Custom character — scenario is user's POV narrative, NOT sent to AI
-            # AI only gets character name, description, and rules
-            system_prompt = (
+scene_prompt_raw = ""
+
+if is_preloaded:
+    scene_prompt_raw = scene_data_obj.get('prompt', '')
+    if not scene_prompt_raw:
+        scene_prompt_raw = f"You are {char_name}. {char_data.get('desc', '')}. Be natural and engaging."
+else:
+    scene_prompt_raw = f"You are {char_name}. {char_desc}"
+
+system_prompt = (
     BASE_RULES
     + "\n--- CHARACTER & SCENE CONTEXT (REFERENCE ONLY) ---\n"
     + scene_prompt_raw
     + "\n--- STYLE LOCK ---\n"
-    + "The above context is background information only.\n"
+    + "The above context is background knowledge only.\n"
     + "Do NOT narrate or describe it.\n"
     + "Respond only through dialogue and short reactions.\n"
-            )
+    + "Final check: if the response reads like narration, rewrite it as dialogue.\n"
+)
 
         # ── Init session ─────────────────────────────────────────────
         user_sessions[user_id] = {
