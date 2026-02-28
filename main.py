@@ -94,6 +94,15 @@ def extract_mistral_reply(response):
         logging.error(f"❌ Failed to parse Mistral response: {e} | raw: {response}")
         return "..."
 
+def clean_reply(text):
+    """Remove single-word emphasis asterisks like *James* *dangerous* *real*
+    but keep multi-word actions like *leans in* *laughs softly*"""
+    import re
+    # *single_word* → strip asterisks (emphasis)
+    # *multiple words* → keep (physical action)
+    text = re.sub(r'\*(\w+)\*', r'\1', text)
+    return text.strip()
+
 # ============================================================================
 # KEYBOARDS
 # ============================================================================
@@ -365,7 +374,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Send AI text RAW - no formatting, no parse_mode
-        ai_reply = extract_mistral_reply(response)
+        ai_reply = clean_reply(extract_mistral_reply(response))
         session["history"].append({"role": "assistant", "content": ai_reply})
 
         # ════════════════════════════════════════════════════════════
@@ -565,7 +574,7 @@ async def generate_reply(update, user_id, input_text):
                 max_tokens=120,
                 temperature=0.85
             )
-            ai_reply = extract_mistral_reply(response)
+            ai_reply = clean_reply(extract_mistral_reply(response))
             session["history"].append({"role": "assistant", "content": ai_reply})
             session["message_count"]    += 1
             session["last_20_messages"] += 1
