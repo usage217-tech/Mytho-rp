@@ -353,7 +353,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ── Get AI opening reply ─────────────────────────────────────
         session["history"].append({
             "role": "user",
-            "content": "Begin the roleplay. Make your first move."
+            "content": "The scene has begun. React naturally."
         })
 
         response = await asyncio.to_thread(
