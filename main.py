@@ -488,6 +488,11 @@ async def generate_reply(update, user_id, input_text):
         # Use a copy so self_check never pollutes the original system prompt
         system_copy = {"role": "system", "content": session["history"][0]["content"]}
 
+        # Every 2nd message — character consistency reminder (not saved to history)
+        if session["message_count"] % 2 == 0:
+            system_copy["content"] += "\n\n<system>Stay in character. Obey rules.</system>"
+            logging.info("🎭 Character reminder injected")
+
         # Every 3rd message — inject self_check into system copy only (not saved to history)
         if session["message_count"] % 3 == 0:
             system_copy["content"] += "\n\n<self_check>Is this conversation still moving forward or repeating the same energy? If flowing — continue naturally. If stalling — suggest something, move somewhere, shift the dynamic.</self_check>"
