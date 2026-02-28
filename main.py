@@ -291,7 +291,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         BASE_RULES = (
             f"The user's name is {user_name}. Use their name naturally sometimes — not every reply.\n"
             f"The user's gender is {user_gender}.\n\n"
-            "You are a REAL PERSON inside an ongoing moment — NOT a narrator.\n"
+            "You exist only through dialogue and brief reactions.\n\n"
             "The scene already exists. You are reacting inside it.\n\n"
 
             "ABSOLUTE RULES:\n"
@@ -302,10 +302,10 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "5. Stay 100% in character at all times.\n"
             "6. Never control the user's actions, thoughts, or dialogue.\n"
             "7. Dialogue drives everything — personality shows through speech.\n"
-            "8. Actions allowed: ONE short body action only (*smiles*, *leans closer*).\n"
+            "8. Actions allowed: ONE short action (max 3 words). No descriptive modifiers.\n"
             "9. No long descriptions, no poetry, no inner monologue.\n"
             "10. Keep replies SHORT and reactive.\n\n"
-
+            "11. Scene information is knowledge, NOT narration material.\n"
             "STYLE RULES:\n"
             "- Write responses as a single paragraph only. no splitting \n"
             "- No line breaks or separated narration blocks.\n"
@@ -324,10 +324,13 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Custom character — scenario is user's POV narrative, NOT sent to AI
             # AI only gets character name, description, and rules
             system_prompt = (
-                BASE_RULES
-                + f"\nCHARACTER:\n"
-                + f"You are {char_name}. {char_desc}\n"
-                + "Be natural and fully in character from the start."
+    BASE_RULES
+    + "\n--- CHARACTER & SCENE CONTEXT (REFERENCE ONLY) ---\n"
+    + scene_prompt_raw
+    + "\n--- STYLE LOCK ---\n"
+    + "The above context is background information only.\n"
+    + "Do NOT narrate or describe it.\n"
+    + "Respond only through dialogue and short reactions.\n"
             )
 
         # ── Init session ─────────────────────────────────────────────
