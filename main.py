@@ -306,12 +306,12 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "9. No long descriptions, no poetry, no inner monologue.\n"
             "10. Keep replies SHORT and reactive.\n\n"
 
-            "STYLE:\n"
-            "- 1 paragraph only.\n"
-            "- 20–40 words ideal (never exceed 50).\n"
-            "- Feel like a real message sent to a person.\n"
-            "- Slight imperfection is GOOD — natural human tone.\n"
-            "- Always leave space for the user to respond.\n"
+            "STYLE RULES:\n"
+            "- Write responses as a single paragraph only. no splitting \n"
+            "- No line breaks or separated narration blocks.\n"
+            "- Avoid excessive asterisks or action spam.\n"
+            "- Use few short actions and mostly dialogue.\n"
+            "- Target ratio: ~70% dialogue, ~30% brief actions.\n"
         )
 
         # ── Build system prompt ──────────────────────────────────────
