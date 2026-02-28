@@ -315,25 +315,25 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # ── Build system prompt ──────────────────────────────────────
-scene_prompt_raw = ""
+        scene_prompt_raw = ""
 
-if is_preloaded:
-    scene_prompt_raw = scene_data_obj.get('prompt', '')
-    if not scene_prompt_raw:
-        scene_prompt_raw = f"You are {char_name}. {char_data.get('desc', '')}. Be natural and engaging."
-else:
-    scene_prompt_raw = f"You are {char_name}. {char_desc}"
+        if is_preloaded:
+            scene_prompt_raw = scene_data_obj.get('prompt', '')
+            if not scene_prompt_raw:
+                scene_prompt_raw = f"You are {char_name}. {char_data.get('desc', '')}. Be natural and engaging."
+        else:
+            scene_prompt_raw = f"You are {char_name}. {char_desc}"
 
-system_prompt = (
-    BASE_RULES
-    + "\n--- CHARACTER & SCENE CONTEXT (REFERENCE ONLY) ---\n"
-    + scene_prompt_raw
-    + "\n--- STYLE LOCK ---\n"
-    + "The above context is background knowledge only.\n"
-    + "Do NOT narrate or describe it.\n"
-    + "Respond only through dialogue and short reactions.\n"
-    + "Final check: if the response reads like narration, rewrite it as dialogue.\n"
-)
+        system_prompt = (
+            BASE_RULES
+            + "\n--- CHARACTER & SCENE CONTEXT (REFERENCE ONLY) ---\n"
+            + scene_prompt_raw
+            + "\n--- STYLE LOCK ---\n"
+            + "The above context is background knowledge only.\n"
+            + "Do NOT narrate or describe it.\n"
+            + "Respond only through dialogue and short reactions.\n"
+            + "Final check: if the response reads like narration, rewrite it as dialogue.\n"
+        )
 
         # ── Init session ─────────────────────────────────────────────
         user_sessions[user_id] = {
@@ -684,3 +684,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
