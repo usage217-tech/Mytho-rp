@@ -186,7 +186,7 @@ async def get_scene_keywords(recent_messages, char_name):
                     f"Output exactly 6 comma-separated phrases. Nothing else."
                 )
             }],
-            temperature=0.5,
+            temperature=0.65,
             max_tokens=40
         )
 
