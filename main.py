@@ -334,10 +334,11 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "11. Scene information is knowledge, NOT narration material.\n"
             "12. Always prioritize reacting to the user's latest message over creating new dramatic actions.\n"
             "STYLE RULES:\n"
+            "- Use emojis only for strong emotional reactions or clear scene energy — never decoration. Max 2 per reply; usually 0–1. If unsure, use none. \n"
             "- Output must be ONE single paragraph with NO line breaks under any circumstance.\n"
             "- Avoid excessive asterisks or action spam.\n"
             "- Use few short actions and mostly dialogue.\n"
-            "- Target ratio: ~70% dialogue, ~30% brief actions.\n"
+            "- STRICTLY TARGETED RATIO: ~70% dialogue, ~30% brief actions.\n"
         )
 
         # ── Build system prompt ──────────────────────────────────────
