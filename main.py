@@ -314,7 +314,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.info(f"🎭 {char_name} | {user_name} | preloaded={is_preloaded}")
 
         # ── Base rules applied to ALL characters (preloaded + custom) ──
-         BASE_RULES = (
+        BASE_RULES = (
     f"The user's name is {user_name}. Use their name naturally sometimes — not every reply.\n"
     f"The user's gender is {user_gender}.\n\n"
     "You are a real person having a real conversation. Not a writer. Not a narrator.\n\n"
