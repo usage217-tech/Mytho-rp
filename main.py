@@ -383,7 +383,8 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model=RP_MODEL,
             messages=session["history"],
             max_tokens=100,
-            temperature=0.85
+            temperature=0.85,
+            random_seed=random.randint(1, 1000000)
         )
 
         # Send AI text RAW - no formatting, no parse_mode
@@ -530,7 +531,8 @@ async def generate_reply(update, user_id, input_text):
                     model=RP_MODEL,
                     messages=rp_inputs,
                     max_tokens=120,
-                    temperature=0.85
+                    temperature=0.85,
+                    random_seed=random.randint(1, 1000000)
                 )
                 return extract_mistral_reply(resp)
 
@@ -582,7 +584,8 @@ async def generate_reply(update, user_id, input_text):
                 model=RP_MODEL,
                 messages=rp_inputs,
                 max_tokens=120,
-                temperature=0.85
+                temperature=0.85,
+                random_seed=random.randint(1, 1000000)
             )
             ai_reply = clean_reply(extract_mistral_reply(response))
             session["history"].append({"role": "assistant", "content": ai_reply})
