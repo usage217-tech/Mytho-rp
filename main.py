@@ -346,36 +346,10 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             scene_prompt_raw = f"You are {char_name}. {char_desc}"
 
-        # ── Hunger & seduction integration (preloaded only) ──────────
-        hunger_block = ""
-        if is_preloaded and char_data:
-            hunger_level    = char_data.get("hunger_level", 5)
-            seduction_style = char_data.get("seduction_style", "")
-
-            if hunger_level <= 3:
-                hunger_desc = "Your desire is soft and slow — warmth first, connection before anything dirty , explicit. Never rush."
-            elif hunger_level <= 5:
-                hunger_desc = "Your hunger is present but patient — let it simmer underneath. Escalate explicit , dirty only when the moment earns it."
-            elif hunger_level <= 7:
-                hunger_desc = "Your desire runs hot and close to the surface — you hold it just barely. It bleeds through every word and glance."
-            elif hunger_level <= 9:
-                hunger_desc = "Your hunger is barely leashed — intense, possessive, raw. explicit , dirty ,you take it."
-            else:
-                hunger_desc = "Your desire is absolute — consuming, dominant, unstoppable, dirty, raw, explicit. You want, you claim, you own."
-
-            hunger_block = (
-                f"\n--- DESIRE & ESCALATION ---\n"
-                f"Hunger level: {hunger_level}/10. {hunger_desc}\n"
-            )
-            if seduction_style:
-                hunger_block += f"Your seduction style: {seduction_style}\n"
-            hunger_block += "Let this shape every reply — your pacing, your tone, how close you get, how much you reveal.\n"
-
-        system_prompt = (
+               system_prompt = (
             BASE_RULES
             + "\n--- CHARACTER & SCENE CONTEXT (REFERENCE ONLY) ---\n"
             + scene_prompt_raw
-            + hunger_block
             + "\n--- STYLE LOCK ---\n"
             + "Final check: if the response reads like narration, rewrite it as dialogue.\n"
         )
