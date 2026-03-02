@@ -71,8 +71,8 @@ user_sessions = {}
 
 FORMAT_RULE = (
     "Reply format — two parts, always, no exceptions:\n"
-    "Line 1: one emoji + env line. max 8 words. sound, light, smell only. no feelings.\n"
-    "Line 2: your dialogue with tiny *actions* woven in. one paragraph. no splitting.\n"
+    "Line 1: one emoji + environment line. Max 2 sentences. sound, light, smell only. no feelings.\n"
+    "Line 2: your dialogue with your tiny *actions* woven in. one paragraph. no splitting. Action should not contain any narrative or inner thoughts. \n"
 )
 
 # ============================================================================
