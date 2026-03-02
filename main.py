@@ -119,7 +119,7 @@ def clean_reply(text):
     line2 = " ".join(line2_parts)
 
     def fix_action(m):
-    return m.group(0)
+        return m.group(0)
 
     line2 = re.sub(r'\*\*([^*]+)\*\*', fix_action, line2)
     line2 = re.sub(r'\*([^*]+)\*',     fix_action, line2)
