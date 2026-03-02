@@ -72,10 +72,10 @@ user_sessions = {}
 FORMAT_RULE = (
     "Reply format — two parts, always:\n"
     "Line 1: line 1 should be wrapped in asterisks. *one suitable emoji + everything in asterisks* — scene, atmosphere, and your actions(in 1st person). MAX 3 SENTENCES, ONE PARAGRAPH.\n"
-    "Line 2: one suitable emoji + your spoken words only. no asterisks. no actions. just dialogue.\n\n"
+    "Line 2: one suitable emoji + your spoken words only. MORE dialogue and can add MAXIMUM 2 small interactive actions (examples - *giggles softly* ,*leans closer*, *jumps out*, *laughs loudly*, *glances softly*, *smiles seductively* , *moans loudly* etc).\n\n"
     "Example:\n"
     "🌧️ *Rain on the glass. Jazz low. She leans in, lets her fingers trace the rim of his cup.*\n"
-    "Too late to pretend you didn't want company. so — tell me something true.\n")
+    "Too late to pretend you didn't want company.*giggles softly* so — tell me something true.\n")
 
 # ============================================================================
 # HELPERS
