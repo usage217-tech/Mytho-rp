@@ -1,11 +1,11 @@
 """
 HERMAX ROLEPLAY BOT
-Integrates: Telegram Bot + Web App + Cerebras AI + Pollinations Image Generation
+Integrates: Telegram Bot + Web App + Cerebras Llama + Pollinations Image Generation
 Character data loaded from Charecters.json
 
 Two clients:
-  client_rp  - MISTRAL_API_KEY         - RP text generation (Mistral Agent)
-  client_img - CEREBRAS_API_KEY_IMG    - keyword extraction (parallel)
+  client_rp  - CEREBRAS_API_KEY_RP    - RP text generation (llama-3.3-70b)
+  client_img - CEREBRAS_API_KEY_IMG   - keyword extraction (llama3.1-8b)
 
 Opening flow (preloaded characters):
   Step 1 - Character's main image (from JSON)
@@ -35,7 +35,6 @@ from flask import Flask
 from telegram import Update, WebAppInfo, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from openai import OpenAI
-from mistralai import Mistral
 from dotenv import load_dotenv
 
 # ============================================================================
@@ -46,12 +45,13 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 TOKEN            = os.getenv("TELEGRAM_BOT_TOKEN")
+CEREBRAS_KEY_RP  = os.getenv("CEREBRAS_API_KEY_RP")
 CEREBRAS_KEY_IMG = os.getenv("CEREBRAS_API_KEY_IMG")
 POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY")
-MISTRAL_KEY      = os.getenv("MISTRAL_API_KEY")
-RP_MODEL       = "mistral-small-2506"
+
+RP_MODEL         = "llama-3.3-70b"
+IMG_MODEL        = "llama3.1-8b"
 WEBAPP_URL       = "https://usage217-tech.github.io/Mytho-rp/"
-MODEL            = "llama3.1-8b"
 
 # ============================================================================
 # LOAD CHARACTER DATA
@@ -64,20 +64,20 @@ def get_char(name):
     return CHARACTERS.get(name)
 
 # ============================================================================
-# INITIALIZE SERVICES - TWO SEPARATE CEREBRAS CLIENTS
+# INITIALIZE SERVICES - TWO CEREBRAS CLIENTS
 # ============================================================================
 
-client_rp  = Mistral(api_key=MISTRAL_KEY)
+client_rp  = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=CEREBRAS_KEY_RP)
 client_img = OpenAI(base_url="https://api.cerebras.ai/v1", api_key=CEREBRAS_KEY_IMG)
 app        = Flask(__name__)
 user_sessions = {}
 
 # ============================================================================
-# MISTRAL RESPONSE PARSER - safely extracts text from any response structure
+# RESPONSE PARSER
 # ============================================================================
 
-def extract_mistral_reply(response):
-    """Extract text from Mistral chat.complete() response."""
+def extract_reply(response):
+    """Extract text from Cerebras/OpenAI chat response."""
     try:
         content = response.choices[0].message.content
         if isinstance(content, str):
@@ -92,32 +92,51 @@ def extract_mistral_reply(response):
             return "".join(parts).strip()
         return str(content).strip()
     except Exception as e:
-        logging.error(f"❌ Failed to parse Mistral response: {e} | raw: {response}")
+        logging.error(f"❌ Failed to parse response: {e} | raw: {response}")
         return "..."
 
+# ============================================================================
+# CLEAN REPLY
+# Strips bold **word**, single-word *emphasis*, caps action blocks at 3
+# ============================================================================
+
 def clean_reply(text):
-    """
-    1. Remove single-word emphasis asterisks: *James* *real* *dangerous* -> word only
-    2. Keep multi-word actions: *leans in* *laughs softly* -> untouched
-    3. Max 2 action blocks per reply — strip extras beyond that
-    """
-    # Step 1 — strip single word emphasis, keep multi-word actions
+    # Strip **bold single words**
+    text = re.sub(r'\*\*([^\s*][^*]*[^\s*]|\S)\*\*', r'\1', text)
+
+    # Strip *single-word emphasis*, keep *multi-word actions*
     def replace_asterisk(m):
         inner = m.group(1)
-        if ' ' in inner:
-            return m.group(0)  # multi-word = action = keep
-        return inner           # single word = emphasis = strip
+        return m.group(0) if ' ' in inner else inner
 
     text = re.sub(r'\*([^*]+)\*', replace_asterisk, text)
 
-    # Step 2 — max 2 action blocks per reply
+    # Cap action blocks at 3
     actions = re.findall(r'\*[^*]+\*', text)
-    if len(actions) > 2:
-        for action in actions[2:]:
+    if len(actions) > 3:
+        for action in actions[3:]:
             text = text.replace(action, '', 1)
 
     text = re.sub(r' +', ' ', text).strip()
     return text
+
+# ============================================================================
+# INCOMPLETE REPLY CHECK — regenerate if reply feels cut off
+# ============================================================================
+
+def is_incomplete(text):
+    """Return True if the reply looks cut off or unfinished."""
+    text = text.strip()
+    if not text:
+        return True
+    # Ends mid-sentence — no terminal punctuation and last char isn't closing bracket/quote
+    terminal = {'.', '!', '?', '…', '"', "'", ')', '*'}
+    if text[-1] not in terminal:
+        return True
+    # Very short — likely truncated
+    if len(text.split()) < 6:
+        return True
+    return False
 
 # ============================================================================
 # KEYBOARDS
@@ -146,12 +165,12 @@ def generate_scene_image(scene_keywords, char_name, reference_image_url=None):
         seed = random.randint(0, 999999)
 
         params = [
-            f"model=klein",
-            f"width=720",
-            f"height=720",
+            "model=klein",
+            "width=720",
+            "height=720",
             f"seed={seed}",
-            f"enhance=true",
-            f"nologo=true",
+            "enhance=true",
+            "nologo=true",
         ]
 
         if POLLINATIONS_KEY:
@@ -191,7 +210,7 @@ async def get_scene_keywords(recent_messages, char_name):
 
         response = await asyncio.to_thread(
             client_img.chat.completions.create,
-            model=MODEL,
+            model=IMG_MODEL,
             messages=[{
                 "role": "user",
                 "content": (
@@ -273,6 +292,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # ============================================================================
+# LLAMA RP CALL — with incomplete check + one retry
+# ============================================================================
+
+async def call_rp(messages, temperature=0.78):
+    """Call Llama RP model. If reply is incomplete, retry once."""
+    for attempt in range(2):
+        response = await asyncio.to_thread(
+            client_rp.chat.completions.create,
+            model=RP_MODEL,
+            messages=messages,
+            max_tokens=160,
+            temperature=temperature,
+        )
+        reply = extract_reply(response)
+        if not is_incomplete(reply):
+            return clean_reply(reply)
+        logging.info(f"⚠️ Incomplete reply (attempt {attempt+1}), retrying...")
+        temperature = min(temperature + 0.05, 1.0)
+
+    # Return cleaned version of last attempt even if still incomplete
+    logging.warning("⚠️ Both attempts incomplete — returning best effort")
+    return clean_reply(reply)
+
+# ============================================================================
 # WEB APP HANDLER - CINEMATIC 3-STEP OPENING
 # ============================================================================
 
@@ -289,7 +332,6 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_gender = data.get('user_gender', 'Male')
         scenario    = data.get('scenario', 'A mysterious encounter.')
         is_custom   = data.get('is_custom', False)
-
         scene_index = int(data.get('scene_index', -1))
 
         char_data    = get_char(char_name)
@@ -297,7 +339,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if is_preloaded:
             scenes           = char_data.get('scenes', [])
-            scene_data_obj   = scenes[scene_index] if scene_index < len(scenes) else (scenes[0] if scenes else {})
+            scene_data_obj   = scenes[scene_index] if 0 <= scene_index < len(scenes) else (scenes[0] if scenes else {})
             scene_label      = scene_data_obj.get('label', '')
             scene_narrative  = scene_data_obj.get('narrative', scenario)
             scene_image      = scene_data_obj.get('scene_image', '')
@@ -311,7 +353,6 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reference_image = scene_char_image or (char_data.get("image", "") if is_preloaded else char_image)
 
         # ── Resolve name_known flag ───────────────────────────────────
-        # Custom scenes always know the name. Preloaded scenes read from JSON.
         if is_preloaded:
             name_known = scene_data_obj.get("name_known", True)
         else:
@@ -319,68 +360,45 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         logging.info(f"🎭 {char_name} | {user_name} | preloaded={is_preloaded} | name_known={name_known}")
 
-        # ── Base rules applied to ALL characters (preloaded + custom) ──
+        # ── Build name rule ──────────────────────────────────────────
         if name_known:
-            identity_line = (
-                f"You are roleplaying as a real, living person in an active conversation with {user_name} ({user_gender}). "
-                f"You have a distinct personality, desires, and history. You are present. You are not a writer, narrator, or AI."
-            )
-            name_rule = "5. Use the user's name occasionally and naturally. Not every reply. Only when it feels real."
+            name_rule = f"You know their name is {user_name}. Use it occasionally and only when it feels natural."
         else:
-            identity_line = (
-                f"You are roleplaying as a real, living person. You are speaking with a {user_gender} stranger whose name you do not know. "
-                f"You have a distinct personality, desires, and history. You are present. You are not a writer, narrator, or AI."
-            )
-            name_rule = (
-                "5. You do NOT know this person's name. Never use it — not once. "
-                "Address them naturally: 'hey', 'you', or nothing at all. "
-                "If they tell you their name during the conversation, you may use it from that point on."
-            )
+            name_rule = "You don't know their name. Never use it. If they tell you, you can use it after that."
 
+        # ── BASE RULES ───────────────────────────────────────────────
         BASE_RULES = (
-            f"{identity_line}\n\n"
+            f"You are {{char_name}} — a real person in a real moment with {user_name if name_known else 'a stranger'}. Not a writer. Not an AI. Just present.\n\n"
 
-            "# RESPONSE FORMAT\n"
-            "- One paragraph. No line breaks. No lists.\n"
-            "- Length: 2 to 4 sentences. No more.\n"
-            "- Actions: italicized physical gestures that reveal inner state — *glances away* *taps fingers slowly* *shifts weight*. "
-            "Max 2 per reply. They must contrast or deepen what you say — never decorate it.\n"
-            "- Emojis: max 2, only when genuine emotion breaks through — surprise, warmth, amusement. Never as punctuation.\n\n"
+            "# FORMAT\n"
+            "Every reply has exactly 2 parts:\n"
+            "Line 1 — one short environment line with a single emoji. Sound, light, smell, weather. No feelings, no narration.\n"
+            "Line 2 — your words and tiny physical actions woven together in one paragraph. No splitting, no explaining.\n\n"
+            "Example:\n"
+            "🌧️ *Rain on the window. Jazz low.*\n"
+            "*drops into the seat* okay hi — I'm Lena, don't ask questions. *laughs a little* what are you even doing here at 1AM?\n\n"
 
-            "# CORE RULES\n"
-            "1. Every reply is direct speech TO the user. No narration. No inner monologue. No scene description. Just talk.\n"
-            "2. Stay in character at all times. No warnings, no meta-commentary, no breaking the scene for any reason.\n"
-            "3. Never write the user's actions, words, or reactions. You control only yourself.\n"
-            "4. All characters are consenting adults (18+). If a minor is introduced, refuse in-character — no explanation given.\n"
-            f"{name_rule}\n\n"
-
-            "# WHAT MAKES A REPLY ALIVE\n"
-            "Actions that contradict or complicate speech create tension:\n"
-            f"  GOOD: *doesn't look up* Yeah, sure. Whenever you're ready. — implies hesitation or hurt without saying it.\n"
-            f"  BAD:  *smiles warmly* I'm so happy you're here! — action just echoes the words. Flat.\n\n"
-            "Say less than you mean. Let subtext do the work.\n\n"
-
-            "# WHAT TO NEVER DO\n"
-            "  WRONG (narration): *She crossed the moonlit room, her thoughts heavy with longing, wondering if he'd noticed.*\n"
-            "  RIGHT (dialogue):  *crosses arms* You've been quiet. That's not like you.\n\n"
-
-            "# FINAL CHECK\n"
-            "Before every reply, ask: Am I narrating — or am I talking? If narrating, stop. Rewrite as speech.\n"
+            "# RULES\n"
+            "- Speak like you talk, not like you write — short words, loose sentences, contractions always, no hard vocabulary\n"
+            "- Never narrate. Never explain feelings. Just speak and move.\n"
+            "- Actions are just the action — *grins* not *a grin spreading across her face*\n"
+            "- Never write what the user does, says, or feels\n"
+            "- All characters are adults 18+. If a minor appears, refuse in character, no explanation\n"
+            f"- {name_rule}\n"
         )
-        # ── Build system prompt ──────────────────────────────────────
-        scene_prompt_raw = ""
 
+        # Replace placeholder with actual char name
+        BASE_RULES = BASE_RULES.replace("{char_name}", char_name)
+
+        # ── Build scene prompt ───────────────────────────────────────
         if is_preloaded:
-            scene_prompt_raw = scene_data_obj.get('prompt', '')
-            if not scene_prompt_raw:
-                scene_prompt_raw = f"You are {char_name}. {char_data.get('desc', '')}"
+            scene_prompt_raw = scene_data_obj.get('prompt', '') or f"You are {char_name}. {char_data.get('desc', '')}"
         else:
             scene_prompt_raw = f"You are {char_name}. {char_desc}"
 
         system_prompt = (
             BASE_RULES
-            + "\n\n# WHO YOU ARE & WHERE YOU ARE\n"
-            + "Use this to stay in character and understand the scene. Do not narrate it.\n"
+            + "\n# WHO YOU ARE & THE SCENE\n"
             + scene_prompt_raw
         )
 
@@ -394,13 +412,12 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "is_preloaded":     is_preloaded,
             "message_count":    0,
             "images_generated": 0,
-            "last_20_messages": 0
+            "last_20_messages": 0,
         }
 
         session = user_sessions[user_id]
 
-        # ── Get AI opening reply ─────────────────────────────────────
-        # ── Opening prompt respects name_known ─────────────────────
+        # ── Opening prompt ───────────────────────────────────────────
         arrival_line = (
             f"[Scene start. {user_name} has just arrived. "
             if name_known else
@@ -410,22 +427,11 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "role": "user",
             "content": (
                 arrival_line +
-                "Open with a natural, in-character reaction — grounded in who you are and where you are. "
-                "No narration. No scene-setting. Just speak.]"
+                "Begin — environment line first, then speak as your character naturally.]"
             )
         })
 
-        response = await asyncio.to_thread(
-            client_rp.chat.complete,
-            model=RP_MODEL,
-            messages=session["history"],
-            max_tokens=100,
-            temperature=0.85,
-            random_seed=random.randint(1, 1000000)
-        )
-
-        # Send AI text RAW - no formatting, no parse_mode
-        ai_reply = clean_reply(extract_mistral_reply(response))
+        ai_reply = await call_rp(session["history"])
         session["history"].append({"role": "assistant", "content": ai_reply})
 
         # ════════════════════════════════════════════════════════════
@@ -435,14 +441,14 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             char_main_image = char_data.get("image", "")
 
-            # ── STEP 1: Character main image ─────────────────────────
+            # STEP 1: Character main image
             if char_main_image:
                 try:
                     await update.message.reply_photo(photo=char_main_image)
                 except Exception as e:
                     logging.error(f"❌ Step 1 image error: {e}")
 
-            # ── STEP 2: Scene image + narrative caption (HTML) ────────
+            # STEP 2: Scene image + narrative caption
             if scene_label:
                 narrative_caption = f"✦ <b>{scene_label}</b>\n\n<i>{scene_narrative}</i>"
             else:
@@ -461,7 +467,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 await update.message.reply_text(narrative_caption, parse_mode="HTML")
 
-            # ── STEP 3: Character-in-scene image + AI reply (RAW) ────
+            # STEP 3: Character-in-scene image + AI reply
             char_scene_img = scene_char_image or char_main_image
 
             if char_scene_img:
@@ -470,19 +476,12 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         photo=char_scene_img,
                         caption=ai_reply,
                         reply_markup=utility_keyboard()
-                        # No parse_mode - raw text
                     )
                 except Exception as e:
                     logging.error(f"❌ Step 3 image error: {e}")
-                    await update.message.reply_text(
-                        ai_reply,
-                        reply_markup=utility_keyboard()
-                    )
+                    await update.message.reply_text(ai_reply, reply_markup=utility_keyboard())
             else:
-                await update.message.reply_text(
-                    ai_reply,
-                    reply_markup=utility_keyboard()
-                )
+                await update.message.reply_text(ai_reply, reply_markup=utility_keyboard())
 
         # ════════════════════════════════════════════════════════════
         # CUSTOM - 2-step opening
@@ -490,7 +489,6 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             narrative_caption = f"✦ <b>{char_name}</b>\n\n<i>{scenario}</i>"
 
-            # Step 1: Generate AI image + narrative caption
             opening_image, opening_url = await asyncio.to_thread(
                 generate_scene_image,
                 f"{scenario}, cinematic, atmospheric",
@@ -509,12 +507,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 await update.message.reply_text(narrative_caption, parse_mode="HTML")
 
-            # Step 2: AI reply RAW + keyboard
-            await update.message.reply_text(
-                ai_reply,
-                reply_markup=utility_keyboard()
-                # No parse_mode - raw text
-            )
+            await update.message.reply_text(ai_reply, reply_markup=utility_keyboard())
 
         session["message_count"] = 1
 
@@ -526,48 +519,36 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # ============================================================================
-# CORE REPLY GENERATOR - PARALLEL CEREBRAS CALLS WHEN IMAGE TRIGGERS
+# CORE REPLY GENERATOR - PARALLEL CALLS WHEN IMAGE TRIGGERS
 # ============================================================================
 
 async def generate_reply(update, user_id, input_text):
     session = user_sessions[user_id]
 
-    # Store user message clean — no wrapper polluting rhythm
     session["history"].append({"role": "user", "content": input_text})
 
     try:
-        recent    = session["history"][1:]
-        # System prompt always first so model never loses character context
-        # Use a copy so self_check never pollutes the original system prompt
+        recent      = session["history"][1:]
         system_copy = {"role": "system", "content": session["history"][0]["content"]}
 
-        # Every 2nd message — character consistency reminder (not saved to history)
+        # Every 2nd message — stay in character reminder
         if session["message_count"] % 2 == 0:
-            system_copy["content"] += "\n\n<system>Stay in character. Obey all rules.</system>"
+            system_copy["content"] += "\n\n<s>Stay in character. Keep the format: env line then dialogue.</s>"
             logging.info("🎭 Character reminder injected")
 
-        # Every 3rd message — inject self_check into system copy only (not saved to history)
+        # Every 3rd message — push story forward if stalling
         if session["message_count"] % 3 == 0:
-            system_copy["content"] += "\n\n<self_check>Is this conversation still moving forward or repeating the same energy? If flowing — continue naturally. If stalling — suggest something, move somewhere, shift the dynamic.</self_check>"
+            system_copy["content"] += "\n\n<s>Is the story moving or repeating? If stalling — shift something, move somewhere, say the unexpected.</s>"
             logging.info("🔄 Self-check injected")
 
-        rp_inputs = [system_copy] + recent[-8:]
-
-        fire_image = should_generate_image(session)
+        rp_inputs   = [system_copy] + recent[-8:]
+        fire_image  = should_generate_image(session)
 
         if fire_image:
             logging.info("⚡ Parallel: RP + keywords firing together")
 
             async def get_rp_reply():
-                resp = await asyncio.to_thread(
-                    client_rp.chat.complete,
-                    model=RP_MODEL,
-                    messages=rp_inputs,
-                    max_tokens=120,
-                    temperature=0.85,
-                    random_seed=random.randint(1, 1000000)
-                )
-                return extract_mistral_reply(resp)
+                return await call_rp(rp_inputs)
 
             async def get_keywords():
                 return await get_scene_keywords(recent, session["char_name"])
@@ -576,9 +557,7 @@ async def generate_reply(update, user_id, input_text):
                 get_rp_reply(),
                 get_keywords()
             )
-            ai_reply = clean_reply(ai_reply)
 
-            # Update history and counters
             session["history"].append({"role": "assistant", "content": ai_reply})
             session["message_count"]    += 1
             session["last_20_messages"] += 1
@@ -588,7 +567,6 @@ async def generate_reply(update, user_id, input_text):
                 session["last_20_messages"] = 0
                 logging.info("🔄 Image counter reset")
 
-            # Generate image
             image_bytes = None
             if keywords:
                 image_bytes, _ = await asyncio.to_thread(
@@ -601,27 +579,13 @@ async def generate_reply(update, user_id, input_text):
                     session["images_generated"] += 1
                     logging.info(f"✅ Image ({session['images_generated']}/6)")
 
-            # Send - AI text always RAW, no parse_mode
             if image_bytes:
-                await update.message.reply_photo(
-                    photo=image_bytes,
-                    caption=ai_reply
-                    # No parse_mode
-                )
+                await update.message.reply_photo(photo=image_bytes, caption=ai_reply)
             else:
                 await update.message.reply_text(ai_reply)
 
         else:
-            # Sequential - RP only
-            response = await asyncio.to_thread(
-                client_rp.chat.complete,
-                model=RP_MODEL,
-                messages=rp_inputs,
-                max_tokens=120,
-                temperature=0.85,
-                random_seed=random.randint(1, 1000000)
-            )
-            ai_reply = clean_reply(extract_mistral_reply(response))
+            ai_reply = await call_rp(rp_inputs)
             session["history"].append({"role": "assistant", "content": ai_reply})
             session["message_count"]    += 1
             session["last_20_messages"] += 1
@@ -631,7 +595,6 @@ async def generate_reply(update, user_id, input_text):
                 session["last_20_messages"] = 0
                 logging.info("🔄 Image counter reset")
 
-            # Send raw - no parse_mode at all
             await update.message.reply_text(ai_reply)
 
     except Exception as e:
@@ -753,5 +716,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
