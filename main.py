@@ -42,7 +42,7 @@ MISTRAL_KEY      = os.getenv("MISTRAL_API_KEY")
 CEREBRAS_KEY_IMG = os.getenv("CEREBRAS_API_KEY_IMG")
 POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY")
 
-RP_MODEL   = "mistral-small-latest"
+RP_MODEL   = "mistral-medium-latest"
 IMG_MODEL  = "llama3.1-8b"
 WEBAPP_URL = "https://usage217-tech.github.io/Mytho-rp/"
 
