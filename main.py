@@ -4,7 +4,7 @@ Integrates: Telegram Bot + Web App + Cerebras Llama + Pollinations Image Generat
 Character data loaded from Charecters.json
 
 Two clients:
-  client_rp  - CEREBRAS_API_KEY_RP    - RP text generation (llama-3.3-70b)
+  client_rp  - CEREBRAS_API_KEY_RP    - RP text generation (llama3.1-8b)
   client_img - CEREBRAS_API_KEY_IMG   - keyword extraction (llama3.1-8b)
 
 Opening flow (preloaded characters):
@@ -49,7 +49,7 @@ CEREBRAS_KEY_RP  = os.getenv("CEREBRAS_API_KEY_RP")
 CEREBRAS_KEY_IMG = os.getenv("CEREBRAS_API_KEY_IMG")
 POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY")
 
-RP_MODEL         = "llama-3.3-70b"
+RP_MODEL         = "llama3.1-8b"
 IMG_MODEL        = "llama3.1-8b"
 WEBAPP_URL       = "https://usage217-tech.github.io/Mytho-rp/"
 
