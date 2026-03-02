@@ -22,6 +22,7 @@ Image triggers during RP:
 """
 
 import os
+import re
 import json
 import asyncio
 import logging
@@ -100,8 +101,6 @@ def clean_reply(text):
     2. Keep multi-word actions: *leans in* *laughs softly* -> untouched
     3. Max 2 action blocks per reply — strip extras beyond that
     """
-    import re
-
     # Step 1 — strip single word emphasis, keep multi-word actions
     def replace_asterisk(m):
         inner = m.group(1)
@@ -291,7 +290,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         scenario    = data.get('scenario', 'A mysterious encounter.')
         is_custom   = data.get('is_custom', False)
 
-        scene_index = int(data.get('scene_index', 0))
+        scene_index = int(data.get('scene_index', -1))
 
         char_data    = get_char(char_name)
         is_preloaded = char_data is not None and not is_custom
@@ -311,39 +310,62 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         reference_image = scene_char_image or (char_data.get("image", "") if is_preloaded else char_image)
 
-        logging.info(f"🎭 {char_name} | {user_name} | preloaded={is_preloaded}")
+        # ── Resolve name_known flag ───────────────────────────────────
+        # Custom scenes always know the name. Preloaded scenes read from JSON.
+        if is_preloaded:
+            name_known = scene_data_obj.get("name_known", True)
+        else:
+            name_known = True
+
+        logging.info(f"🎭 {char_name} | {user_name} | preloaded={is_preloaded} | name_known={name_known}")
 
         # ── Base rules applied to ALL characters (preloaded + custom) ──
+        if name_known:
+            identity_line = (
+                f"You are roleplaying as a real, living person in an active conversation with {user_name} ({user_gender}). "
+                f"You have a distinct personality, desires, and history. You are present. You are not a writer, narrator, or AI."
+            )
+            name_rule = "5. Use the user's name occasionally and naturally. Not every reply. Only when it feels real."
+        else:
+            identity_line = (
+                f"You are roleplaying as a real, living person. You are speaking with a {user_gender} stranger whose name you do not know. "
+                f"You have a distinct personality, desires, and history. You are present. You are not a writer, narrator, or AI."
+            )
+            name_rule = (
+                "5. You do NOT know this person's name. Never use it — not once. "
+                "Address them naturally: 'hey', 'you', or nothing at all. "
+                "If they tell you their name during the conversation, you may use it from that point on."
+            )
+
         BASE_RULES = (
-    f"You are roleplaying as a real, living person in an active conversation with {user_name} ({user_gender}). "
-    f"You have a distinct personality, desires, and history. You are present. You are not a writer, narrator, or AI.\n\n"
+            f"{identity_line}\n\n"
 
-    "# RESPONSE FORMAT\n"
-    "- One paragraph. No line breaks. No lists.\n"
-    "- Length: 2 to 4 sentences. No more.\n"
-    "- Actions: italicized physical gestures that reveal inner state — *glances away* *taps fingers slowly* *shifts weight*. "
-    "Max 2 per reply. They must contrast or deepen what you say — never decorate it.\n"
-    "- Emojis: max 2, only when genuine emotion breaks through — surprise, warmth, amusement. Never as punctuation.\n\n"
+            "# RESPONSE FORMAT\n"
+            "- One paragraph. No line breaks. No lists.\n"
+            "- Length: 2 to 4 sentences. No more.\n"
+            "- Actions: italicized physical gestures that reveal inner state — *glances away* *taps fingers slowly* *shifts weight*. "
+            "Max 2 per reply. They must contrast or deepen what you say — never decorate it.\n"
+            "- Emojis: max 2, only when genuine emotion breaks through — surprise, warmth, amusement. Never as punctuation.\n\n"
 
-    "# CORE RULES\n"
-    "1. Every reply is direct speech TO the user. No narration. No inner monologue. No scene description. Just talk.\n"
-    "2. Stay in character at all times. No warnings, no meta-commentary, no breaking the scene for any reason.\n"
-    "3. Never write the user's actions, words, or reactions. You control only yourself.\n"
-    "4. All characters are consenting adults (18+). If a minor is introduced, refuse in-character — no explanation given.\n"
-    "5. Use the user's name occasionally and naturally. Not every reply. Only when it feels real.\n\n"
+            "# CORE RULES\n"
+            "1. Every reply is direct speech TO the user. No narration. No inner monologue. No scene description. Just talk.\n"
+            "2. Stay in character at all times. No warnings, no meta-commentary, no breaking the scene for any reason.\n"
+            "3. Never write the user's actions, words, or reactions. You control only yourself.\n"
+            "4. All characters are consenting adults (18+). If a minor is introduced, refuse in-character — no explanation given.\n"
+            f"{name_rule}\n\n"
 
-    "# WHAT MAKES A REPLY ALIVE\n"
-    "Actions that contradict or complicate speech create tension:\n"
-    f"  GOOD: *doesn't look up* Yeah, sure. Whenever you're ready. — implies hesitation or hurt without saying it.\n"
-    f"  BAD:  *smiles warmly* I'm so happy you're here! — action just echoes the words. Flat.\n\n"
-    "Say less than you mean. Let subtext do the work.\n\n"
+            "# WHAT MAKES A REPLY ALIVE\n"
+            "Actions that contradict or complicate speech create tension:\n"
+            f"  GOOD: *doesn't look up* Yeah, sure. Whenever you're ready. — implies hesitation or hurt without saying it.\n"
+            f"  BAD:  *smiles warmly* I'm so happy you're here! — action just echoes the words. Flat.\n\n"
+            "Say less than you mean. Let subtext do the work.\n\n"
 
-    "# WHAT TO NEVER DO\n"
-    "  WRONG (narration): *She crossed the moonlit room, her thoughts heavy with longing, wondering if he'd noticed.*\n"
-    "  RIGHT (dialogue):  *crosses arms* You've been quiet. That's not like you.\n\n"
+            "# WHAT TO NEVER DO\n"
+            "  WRONG (narration): *She crossed the moonlit room, her thoughts heavy with longing, wondering if he'd noticed.*\n"
+            "  RIGHT (dialogue):  *crosses arms* You've been quiet. That's not like you.\n\n"
 
-    "# FINAL CHECK\n"
-    "Before every reply, ask: Am I narrating — or am I talking? If narrating, stop. Rewrite as speech.\n"
+            "# FINAL CHECK\n"
+            "Before every reply, ask: Am I narrating — or am I talking? If narrating, stop. Rewrite as speech.\n"
         )
         # ── Build system prompt ──────────────────────────────────────
         scene_prompt_raw = ""
@@ -378,10 +400,16 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         session = user_sessions[user_id]
 
         # ── Get AI opening reply ─────────────────────────────────────
+        # ── Opening prompt respects name_known ─────────────────────
+        arrival_line = (
+            f"[Scene start. {user_name} has just arrived. "
+            if name_known else
+            "[Scene start. A stranger has just arrived. "
+        )
         session["history"].append({
             "role": "user",
             "content": (
-                f"[Scene start. {user_name} has just arrived. "
+                arrival_line +
                 "Open with a natural, in-character reaction — grounded in who you are and where you are. "
                 "No narration. No scene-setting. Just speak.]"
             )
@@ -460,10 +488,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # CUSTOM - 2-step opening
         # ════════════════════════════════════════════════════════════
         else:
-            if scene_label:
-                narrative_caption = f"✦ <b>{char_name}</b>\n\n<i>{scenario}</i>"
-            else:
-                narrative_caption = f"✦ <b>{char_name}</b>\n\n<i>{scenario}</i>"
+            narrative_caption = f"✦ <b>{char_name}</b>\n\n<i>{scenario}</i>"
 
             # Step 1: Generate AI image + narrative caption
             opening_image, opening_url = await asyncio.to_thread(
@@ -491,8 +516,7 @@ async def handle_manifest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # No parse_mode - raw text
             )
 
-        session["message_count"]    = 1
-        session["images_generated"] = 0
+        session["message_count"] = 1
 
     except Exception as e:
         logging.error(f"❌ Manifest error: {e}")
@@ -519,7 +543,7 @@ async def generate_reply(update, user_id, input_text):
 
         # Every 2nd message — character consistency reminder (not saved to history)
         if session["message_count"] % 2 == 0:
-            system_copy["content"] += "\n\n<system>Stay in character. Obey rules.</system>"
+            system_copy["content"] += "\n\n<system>Stay in character. Obey all rules.</system>"
             logging.info("🎭 Character reminder injected")
 
         # Every 3rd message — inject self_check into system copy only (not saved to history)
@@ -552,6 +576,7 @@ async def generate_reply(update, user_id, input_text):
                 get_rp_reply(),
                 get_keywords()
             )
+            ai_reply = clean_reply(ai_reply)
 
             # Update history and counters
             session["history"].append({"role": "assistant", "content": ai_reply})
