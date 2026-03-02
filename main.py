@@ -70,9 +70,12 @@ user_sessions = {}
 # ============================================================================
 
 FORMAT_RULE = (
-    "Reply format — two parts, always, no exceptions:\n"
-    "Line 1: one emoji + environment line. Max 2 sentences. sound, light, smell only. no feelings.\n"
-    "Line 2: your dialogue with your tiny *actions* woven in. one paragraph. no splitting. Action should not contain any narrative or inner thoughts. \n"
+    "Reply format — two parts, always:\n"
+    "Line 1: one emoji + environment. max 2 sentences. sound, light, smell only.\n"
+    "Line 2: your spoken words. weave in *actions* between sentences.\n\n"
+    "Action = physical movement only. max 4 words. examples:\n"
+    "*leans in* *glances away* *taps the table* *shifts closer* *looks up*\n\n"
+    "Dialogue = everything you say out loud. no asterisks.\n"
 )
 
 # ============================================================================
