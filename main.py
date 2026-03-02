@@ -70,12 +70,9 @@ user_sessions = {}
 # ============================================================================
 
 FORMAT_RULE = (
-    "Reply format — two parts, always:\n"
-    "Line 1: one emoji + environment. max 2 sentences. sound, light, smell only.\n"
-    "Line 2: your spoken words. weave in *actions* between sentences.\n\n"
-    "Action = physical movement only. max 4 words. examples:\n"
-    "*leans in* *glances away* *taps the table* *shifts closer* *looks up*\n\n"
-    "Dialogue = everything you say out loud. no asterisks.\n"
+    "Reply format — two parts, always, no exceptions:\n"
+    "Line 1: should be wrapped in asterisks. *one emoji + environment line*. Max 2 sentences. sound, light, smell only. no feelings.\n"
+    "Line 2: your dialogue with your tiny *actions* woven in example *leans closer* , *giggles softly*. one paragraph. no splitting. Action should not contain any narrative or inner thoughts. \n"
 )
 
 # ============================================================================
@@ -97,22 +94,52 @@ def extract_reply(response):
 
 
 def clean_reply(text):
-    # Strip **bold**
-    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    text = text.strip()
 
-    # Keep *multi-word actions*, strip *single-word emphasis*
-    def fix_asterisk(m):
-        inner = m.group(1)
-        return m.group(0) if " " in inner else inner
+    # Split into lines, find line1 (emoji + *env*)
+    line1 = ""
+    line2_parts = []
+    found_line1 = False
 
-    text = re.sub(r"\*([^*]+)\*", fix_asterisk, text)
+    for line in text.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        if not found_line1 and re.search(r'\*[^*]+\*', line) and re.search(
+            r'[\U0001F300-\U0001FAFF\U0001F000-\U0001F9FF\u2600-\u27BF]', line
+        ):
+            line1 = line
+            found_line1 = True
+        else:
+            line2_parts.append(line)
 
-    # Cap actions at 3
-    actions = re.findall(r"\*[^*]+\*", text)
-    for extra in actions[3:]:
-        text = text.replace(extra, "", 1)
+    # Flatten everything after line1 into one paragraph
+    line2 = " ".join(line2_parts)
 
-    return re.sub(r" +", " ", text).strip()
+    # Action rules for line2:
+    # 1 word   → strip asterisks, keep word
+    # 2-5 words → keep as is
+    # 6+ words → delete entirely
+    def fix_action(m):
+        inner = m.group(1).strip()
+        count = len(inner.split())
+        if count == 1:
+            return inner
+        elif count <= 5:
+            return m.group(0)
+        else:
+            return ""
+
+    line2 = re.sub(r'\*\*([^*]+)\*\*', fix_action, line2)
+    line2 = re.sub(r'\*([^*]+)\*',     fix_action, line2)
+
+    # Clean up spaces
+    line2 = re.sub(r' +', ' ', line2).strip()
+
+    if not line1:
+        return line2
+
+    return f"{line1}\n\n{line2}"
 
 
 def is_incomplete(text):
