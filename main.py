@@ -42,7 +42,7 @@ MISTRAL_KEY      = os.getenv("MISTRAL_API_KEY")
 CEREBRAS_KEY_IMG = os.getenv("CEREBRAS_API_KEY_IMG")
 POLLINATIONS_KEY = os.getenv("POLLINATIONS_API_KEY")
 
-RP_MODEL   = "mistral-large-latest"
+RP_MODEL   = "mistral-small-latest"
 IMG_MODEL  = "llama3.1-8b"
 WEBAPP_URL = "https://usage217-tech.github.io/Mytho-rp/"
 
@@ -71,9 +71,11 @@ user_sessions = {}
 
 FORMAT_RULE = (
     "Reply format — two parts, always:\n"
-    "Line 1: line 1 should be wrapped in asterisks. *one suitable emoji + everything in asterisks* — scene, atmosphere, and what you are physically doing. one paragraph.\n"
-    "Line 2: your dialogue with your very short tiny (1 or 2 word) *actions* woven in example *leans closer* , *giggles softly*. one paragraph. no splitting. Action should not contain any narrative or inner thoughts. \n"
-)
+    "Line 1: line 1 should be wrapped in asterisks. *one suitable emoji + everything in asterisks* — scene, atmosphere, and your actions(in 1st person). MAX 3 SENTENCES, ONE PARAGRAPH.\n"
+    "Line 2: one suitable emoji + your spoken words only. no asterisks. no actions. just dialogue.\n\n"
+    "Example:\n"
+    "🌧️ *Rain on the glass. Jazz low. She leans in, lets her fingers trace the rim of his cup.*\n"
+    "Too late to pretend you didn't want company. so — tell me something true.\n")
 
 # ============================================================================
 # HELPERS
