@@ -118,19 +118,8 @@ def clean_reply(text):
     # Flatten everything after line1 into one paragraph
     line2 = " ".join(line2_parts)
 
-    # Action rules for line2:
-    # 1 word   → strip asterisks, keep word
-    # 2-5 words → keep as is
-    # 6+ words → delete entirely
     def fix_action(m):
-        inner = m.group(1).strip()
-        count = len(inner.split())
-        if count == 1:
-            return inner
-        elif count <= 5:
-            return m.group(0)
-        else:
-            return ""
+    return m.group(0)
 
     line2 = re.sub(r'\*\*([^*]+)\*\*', fix_action, line2)
     line2 = re.sub(r'\*([^*]+)\*',     fix_action, line2)
